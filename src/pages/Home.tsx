@@ -13,7 +13,7 @@ export default function Home() {
           下载模板 → 在 Excel 中填写员工信息 → 上传 → 自动算出职级与月薪。
         </p>
       </div>
-      <Row gutter={[20, 20]}>
+      <Row gutter={[20, 32]}>
         {POSITION_LIST.map((cfg) => (
           <Col key={cfg.key} xs={24} sm={12} lg={8}>
             <div
