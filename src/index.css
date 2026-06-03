@@ -1,0 +1,122 @@
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+body {
+  background: #f5f7fb;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  color: #1f2937;
+}
+.app-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.app-header {
+  background: #fff;
+  padding: 14px 32px;
+  border-bottom: 1px solid #ebedf2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.app-header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: #1f2937;
+}
+.app-header .subtitle {
+  color: #6b7280;
+  font-size: 13px;
+}
+.app-main {
+  flex: 1;
+  padding: 24px 32px;
+  max-width: 1400px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 auto;
+}
+.home-intro {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px 28px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.home-intro h2 {
+  font-size: 18px;
+  margin: 0 0 6px;
+  color: #1f2937;
+}
+.home-intro p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+.position-card {
+  height: 100%;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.position-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+.position-card .card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.position-card h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+.position-card p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.workbench-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.workbench-section h3 {
+  font-size: 15px;
+  margin: 0 0 12px;
+  color: #1f2937;
+}
+.row-error > td {
+  background-color: #fff1f0 !important;
+}
+.row-error:hover > td {
+  background-color: #ffe1de !important;
+}
+.summary-strip {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 12px 0 16px;
+  color: #4b5563;
+  font-size: 13px;
+}
+.summary-strip strong {
+  color: #1f2937;
+  font-size: 15px;
+}
