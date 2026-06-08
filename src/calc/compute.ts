@@ -10,10 +10,12 @@ import {
   CROSS_BORDER,
   LIVESTREAM,
   LIVESTREAM_INCENTIVE,
+  LIVESTREAM_OPS,
   MALL_OPS,
   POSITIONS,
   PRODUCT_OPS,
   VIDEO_CONTENT,
+  VIDEO_OPS,
 } from "./tables";
 import type { Bracket, Employee, PositionKey, PositionResult } from "./types";
 
@@ -254,7 +256,7 @@ function computeProduct(emp: Employee, r: PositionResult): void {
   if (eduOrAssistant(emp, r)) return;
   const dept = emp.dept;
   if (!dept || !(dept in PRODUCT_OPS)) {
-    errors.push(`产品运营岗必须指定 dept: 电商三部/其他部门（收到: ${JSON.stringify(dept)}）`);
+    errors.push(`天猫/拼多多运营岗必须指定 dept: 电商三部/其他部门（收到: ${JSON.stringify(dept)}）`);
     return;
   }
   const v = need(emp, "perf_personal", errors, "季度月均销售额万元") as number | undefined;
@@ -278,6 +280,95 @@ function computeProduct(emp: Employee, r: PositionResult): void {
   finalize(r, emp, sal, b.formula === "fixed");
 }
 
+/**
+ * 直播运营/主播组长 与 视频运营 共用：个人薪资 + 管理薪资 双轨叠加。
+ * - account_type === "抖音官旗" 时，先把 perf_personal × 0.8 再做区间匹配
+ * - per_capita_value 填了就匹配管理薪资区间表（不区分职级）；未填 → 不评管理薪资
+ * - per_capita_value 低于最低档 → 管理薪资=0，notes 提示，主薪不受影响
+ * - 与「跨境组长」叠加管理薪资的 finalize 处理一致：固定薪资不取百，计算薪资取百
+ */
+function computeWithPerCapitaMgmt(
+  emp: Employee,
+  r: PositionResult,
+  personalTable: Bracket[],
+  mgmtTable: Bracket[],
+  belowPersonalMsg: (v: number) => string,
+  positionLabel: string,
+): void {
+  const { notes, errors } = r;
+
+  const acc = emp.account_type;
+  if (!acc || (acc !== "抖音官旗" && acc !== "非官旗")) {
+    errors.push(`${positionLabel}必须指定 account_type: 抖音官旗/非官旗（收到: ${JSON.stringify(acc)}）`);
+    return;
+  }
+
+  const v = need(emp, "perf_personal", errors, "季度月均净销售额万元") as number | undefined;
+  if (v === undefined) return;
+
+  // 官旗折算
+  const isOfficial = acc === "抖音官旗";
+  const perfAdj = isOfficial ? v * 0.8 : v;
+
+  const b = findBracket(personalTable, perfAdj);
+  if (!b) {
+    errors.push(belowPersonalMsg(perfAdj));
+    return;
+  }
+  r.grade = b.grade ?? null;
+  captureBracket(r, b);
+  const personal = salaryFromBracket(b, perfAdj);
+
+  // 个人部分 trace
+  let trace = "";
+  if (isOfficial) {
+    trace = `账号官旗，业绩 ${v}万×0.8=${perfAdj}万 → ${traceOf(b, perfAdj)}`;
+  } else {
+    trace = traceOf(b, perfAdj);
+  }
+
+  // 管理薪资部分（与职级无关，专家/高级一样计算）
+  let mgmt = 0;
+  const pcv = emp.per_capita_value;
+  if (pcv !== undefined && pcv !== null) {
+    const mb = findBracket(mgmtTable, pcv);
+    if (!mb) {
+      // 低于最低档：mgmt=0，notes 提示
+      const lowest = mgmtTable[mgmtTable.length - 1]?.lo;
+      notes.push(`人均净产值 ${pcv} 万低于最低档（${lowest}万），不评管理薪资`);
+    } else {
+      mgmt = salaryFromBracket(mb, pcv);
+      trace += ` ; 管理部分(人均净产值${pcv}万)=${money(mgmt)}`;
+    }
+  }
+
+  r.trace = trace;
+  r.raw_salary = personal + mgmt;
+  finalize(r, emp, personal, b.formula === "fixed", mgmt);
+}
+
+function computeLivestreamOps(emp: Employee, r: PositionResult): void {
+  computeWithPerCapitaMgmt(
+    emp,
+    r,
+    LIVESTREAM_OPS.personal,
+    LIVESTREAM_OPS.mgmt,
+    (v) => `季度月均净销售额(折算后) ${v} 万元 低于最低评级区间[10万)，需谈薪/人工处理`,
+    "直播运营/主播组长岗",
+  );
+}
+
+function computeVideoOps(emp: Employee, r: PositionResult): void {
+  computeWithPerCapitaMgmt(
+    emp,
+    r,
+    VIDEO_OPS.personal,
+    VIDEO_OPS.mgmt,
+    (v) => `季度月均净销售额(折算后) ${v} 万元 低于最低评级区间[30万)，需谈薪/人工处理`,
+    "视频运营岗",
+  );
+}
+
 const DISPATCH: Record<PositionKey, (emp: Employee, r: PositionResult) => void> = {
   video_content: computeVideo,
   cross_border_ops: computeCrossBorder,
@@ -285,6 +376,8 @@ const DISPATCH: Record<PositionKey, (emp: Employee, r: PositionResult) => void> 
   mall_ops: computeMall,
   livestream_host: computeLivestream,
   product_ops: computeProduct,
+  livestream_ops: computeLivestreamOps,
+  video_ops: computeVideoOps,
 };
 
 export function computeOne(emp: Employee): PositionResult {
@@ -300,6 +393,7 @@ export function computeOne(emp: Employee): PositionResult {
     perf_team: emp.perf_team,
     span_of_control: emp.span_of_control,
     monthly_net_sales: emp.monthly_net_sales,
+    per_capita_value: emp.per_capita_value,
     probation: emp.probation,
     grade: null,
     monthly_salary: null,

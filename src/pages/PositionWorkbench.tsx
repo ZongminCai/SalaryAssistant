@@ -81,10 +81,10 @@ export default function PositionWorkbench() {
     setFileName("");
   };
 
-  // 表格列。input 列里 perf_personal 之后追加"个人月均业绩"一列。
+  // 表格列。
   const dash = <span style={{ color: "#bbb" }}>—</span>;
 
-  const inputColsBase = cfg.fields.map((f) => ({
+  const inputCols = cfg.fields.map((f) => ({
     title: f.label,
     dataIndex: f.key,
     key: f.key,
@@ -95,21 +95,6 @@ export default function PositionWorkbench() {
       return String(v);
     },
   }));
-
-  // 在 perf_personal 之后插入"个人月均业绩(万元)"
-  const monthlyPerfCol = {
-    title: "个人月均业绩(万元)",
-    dataIndex: "monthly_perf",
-    key: "monthly_perf",
-    width: 150,
-    render: (v: number | null | undefined) =>
-      v !== null && v !== undefined ? v.toFixed(2) : dash,
-  };
-  const perfIdx = cfg.fields.findIndex((f) => f.key === "perf_personal");
-  const inputCols =
-    perfIdx >= 0
-      ? [...inputColsBase.slice(0, perfIdx + 1), monthlyPerfCol, ...inputColsBase.slice(perfIdx + 1)]
-      : inputColsBase;
 
   const isLivestream = cfg.key === "livestream_host";
 

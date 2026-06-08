@@ -4,7 +4,9 @@ export type PositionKey =
   | "business_bd"
   | "mall_ops"
   | "livestream_host"
-  | "product_ops";
+  | "product_ops"
+  | "livestream_ops"
+  | "video_ops";
 
 export interface Employee {
   name?: string;
@@ -18,6 +20,8 @@ export interface Employee {
   perf_team?: number;
   span_of_control?: number;
   monthly_net_sales?: number;
+  /** 人均净产值(万元) — livestream_ops / video_ops 的管理薪资判据，可选；填了才评管理薪资 */
+  per_capita_value?: number;
   probation?: boolean;
   /** 表格里的行号（从 1 开始），用于错误定位 */
   __rowIndex?: number;
@@ -50,6 +54,7 @@ export interface PositionResult {
   perf_team?: number;
   span_of_control?: number;
   monthly_net_sales?: number;
+  per_capita_value?: number;
   probation?: boolean;
   grade: string | null;
   monthly_salary: number | null;

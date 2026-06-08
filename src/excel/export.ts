@@ -9,14 +9,8 @@ function fmtDate(d: Date): string {
 }
 
 export function exportResults(results: PositionResult[], cfg: PositionConfig): void {
-  // 通用输入列：在 perf_personal 之后插入"个人月均业绩(万元)"
-  const baseInputCols = cfg.fields.map((f) => ({ key: f.key, label: f.label }));
-  const perfIdx = cfg.fields.findIndex((f) => f.key === "perf_personal");
-  const monthlyPerfCol = { key: "monthly_perf", label: "个人月均业绩(万元)" };
-  const inputCols =
-    perfIdx >= 0
-      ? [...baseInputCols.slice(0, perfIdx + 1), monthlyPerfCol, ...baseInputCols.slice(perfIdx + 1)]
-      : baseInputCols;
+  // 通用输入列
+  const inputCols = cfg.fields.map((f) => ({ key: f.key, label: f.label }));
 
   // 评级结果列：monthly_salary 之后、trace 之前插入 7 个明细列
   const resultCols = [
@@ -45,10 +39,6 @@ export function exportResults(results: PositionResult[], cfg: PositionConfig): v
   for (const r of results) {
     const row: unknown[] = [r.__rowIndex ?? ""];
     for (const c of inputCols) {
-      if (c.key === "monthly_perf") {
-        row.push(r.monthly_perf !== undefined && r.monthly_perf !== null ? Number(r.monthly_perf.toFixed(2)) : "");
-        continue;
-      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const v = (r as any)[c.key];
       if (typeof v === "boolean") row.push(v ? "是" : "否");

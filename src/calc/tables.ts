@@ -167,11 +167,59 @@ export const PRODUCT_OPS: Record<string, Bracket[]> = {
   ],
 };
 
+// 7) 直播运营/主播组长岗  总裁办〔2026〕9号  季度月均净销售额(万元)
+//    与岗位评定独立的「管理薪资」按 人均净产值(万元) 单独匹配
+export const LIVESTREAM_OPS = {
+  personal: [
+    { lo: 500, hi: null, formula: "fixed", fixed: 35000, grade: "专家直播运营" },
+    { lo: 300, hi: 500, sal_lo: 20000, sal_hi: 30000, grade: "高级直播运营" },
+    { lo: 200, hi: 300, sal_lo: 15000, sal_hi: 20000, grade: "高级直播运营" },
+    { lo: 120, hi: 200, sal_lo: 12000, sal_hi: 15000, grade: "中级直播运营" },
+    { lo: 80, hi: 120, sal_lo: 10000, sal_hi: 12000, grade: "中级直播运营" },
+    { lo: 50, hi: 80, sal_lo: 8000, sal_hi: 10000, grade: "中级直播运营" },
+    { lo: 30, hi: 50, sal_lo: 7000, sal_hi: 8000, grade: "初级直播运营" },
+    { lo: 20, hi: 30, sal_lo: 6000, sal_hi: 7000, grade: "初级直播运营" },
+    { lo: 10, hi: 20, sal_lo: 5000, sal_hi: 6000, grade: "初级直播运营" },
+  ] as Bracket[],
+  mgmt: [
+    { lo: 50, hi: null, formula: "fixed", fixed: 4000 },
+    { lo: 30, hi: 50, sal_lo: 2500, sal_hi: 3500 },
+    { lo: 20, hi: 30, sal_lo: 2000, sal_hi: 2500 },
+    { lo: 10, hi: 20, sal_lo: 1500, sal_hi: 2000 },
+    { lo: 5, hi: 10, sal_lo: 1000, sal_hi: 1500 },
+    { lo: 3, hi: 5, sal_lo: 500, sal_hi: 1000 },
+  ] as Bracket[],
+};
+
+// 8) 视频运营岗  总裁办〔2026〕9号  季度月均净销售额(万元)
+export const VIDEO_OPS = {
+  personal: [
+    { lo: 500, hi: null, formula: "fixed", fixed: 35000, grade: "专家视频运营" },
+    { lo: 400, hi: 500, sal_lo: 20000, sal_hi: 30000, grade: "高级视频运营" },
+    { lo: 300, hi: 400, sal_lo: 16000, sal_hi: 20000, grade: "高级视频运营" },
+    { lo: 200, hi: 300, sal_lo: 12000, sal_hi: 16000, grade: "中级视频运营" },
+    { lo: 120, hi: 200, sal_lo: 9000, sal_hi: 12000, grade: "中级视频运营" },
+    { lo: 80, hi: 120, sal_lo: 8000, sal_hi: 9000, grade: "初级视频运营" },
+    { lo: 50, hi: 80, sal_lo: 6000, sal_hi: 7000, grade: "初级视频运营" },
+    { lo: 30, hi: 50, sal_lo: 5000, sal_hi: 6000, grade: "初级视频运营" },
+  ] as Bracket[],
+  mgmt: [
+    { lo: 100, hi: null, formula: "fixed", fixed: 4000 },
+    { lo: 70, hi: 100, sal_lo: 2500, sal_hi: 3500 },
+    { lo: 50, hi: 70, sal_lo: 2000, sal_hi: 2500 },
+    { lo: 30, hi: 50, sal_lo: 1500, sal_hi: 2000 },
+    { lo: 15, hi: 30, sal_lo: 1000, sal_hi: 1500 },
+    { lo: 10, hi: 15, sal_lo: 500, sal_hi: 1000 },
+  ] as Bracket[],
+};
+
 export const POSITIONS: Record<PositionKey, string> = {
   video_content: "视频内容岗",
   cross_border_ops: "跨境运营岗",
   business_bd: "商务岗",
   mall_ops: "抖音/快手商城运营岗",
   livestream_host: "主播岗",
-  product_ops: "产品运营岗",
+  product_ops: "天猫/拼多多运营岗",
+  livestream_ops: "直播运营/主播组长岗",
+  video_ops: "视频运营岗",
 };
