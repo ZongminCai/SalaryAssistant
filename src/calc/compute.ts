@@ -282,7 +282,6 @@ function computeProduct(emp: Employee, r: PositionResult): void {
 
 /**
  * 直播运营/主播组长 与 视频运营 共用：个人薪资 + 管理薪资 双轨叠加。
- * - account_type === "抖音官旗" 时，先把 perf_personal × 0.8 再做区间匹配
  * - per_capita_value 填了就匹配管理薪资区间表（不区分职级）；未填 → 不评管理薪资
  * - per_capita_value 低于最低档 → 管理薪资=0，notes 提示，主薪不受影响
  * - 与「跨境组长」叠加管理薪资的 finalize 处理一致：固定薪资不取百，计算薪资取百
@@ -293,39 +292,22 @@ function computeWithPerCapitaMgmt(
   personalTable: Bracket[],
   mgmtTable: Bracket[],
   belowPersonalMsg: (v: number) => string,
-  positionLabel: string,
 ): void {
   const { notes, errors } = r;
-
-  const acc = emp.account_type;
-  if (!acc || (acc !== "抖音官旗" && acc !== "非官旗")) {
-    errors.push(`${positionLabel}必须指定 account_type: 抖音官旗/非官旗（收到: ${JSON.stringify(acc)}）`);
-    return;
-  }
 
   const v = need(emp, "perf_personal", errors, "季度月均净销售额万元") as number | undefined;
   if (v === undefined) return;
 
-  // 官旗折算
-  const isOfficial = acc === "抖音官旗";
-  const perfAdj = isOfficial ? v * 0.8 : v;
-
-  const b = findBracket(personalTable, perfAdj);
+  const b = findBracket(personalTable, v);
   if (!b) {
-    errors.push(belowPersonalMsg(perfAdj));
+    errors.push(belowPersonalMsg(v));
     return;
   }
   r.grade = b.grade ?? null;
   captureBracket(r, b);
-  const personal = salaryFromBracket(b, perfAdj);
+  const personal = salaryFromBracket(b, v);
 
-  // 个人部分 trace
-  let trace = "";
-  if (isOfficial) {
-    trace = `账号官旗，业绩 ${v}万×0.8=${perfAdj}万 → ${traceOf(b, perfAdj)}`;
-  } else {
-    trace = traceOf(b, perfAdj);
-  }
+  let trace = traceOf(b, v);
 
   // 管理薪资部分（与职级无关，专家/高级一样计算）
   let mgmt = 0;
@@ -347,26 +329,46 @@ function computeWithPerCapitaMgmt(
   finalize(r, emp, personal, b.formula === "fixed", mgmt);
 }
 
+// 直播运营/主播组长岗 合法 level
+const LIVESTREAM_OPS_LEVELS = ["直播运营专员", "直播运营组长", "主播组长"] as const;
+// 视频运营岗 合法 level
+const VIDEO_OPS_LEVELS = ["视频运营专员", "视频运营组长"] as const;
+
 function computeLivestreamOps(emp: Employee, r: PositionResult): void {
+  const level = emp.level;
+  if (!level || !(LIVESTREAM_OPS_LEVELS as readonly string[]).includes(level)) {
+    r.errors.push(`直播运营/主播组长岗 level 必须为 ${LIVESTREAM_OPS_LEVELS.join("/")}（收到: ${JSON.stringify(level)}）`);
+    return;
+  }
   computeWithPerCapitaMgmt(
     emp,
     r,
     LIVESTREAM_OPS.personal,
     LIVESTREAM_OPS.mgmt,
-    (v) => `季度月均净销售额(折算后) ${v} 万元 低于最低评级区间[10万)，需谈薪/人工处理`,
-    "直播运营/主播组长岗",
+    (v) => `季度月均净销售额 ${v} 万元 低于最低评级区间[10万)，需谈薪/人工处理`,
   );
+  // 组长 grade 用 level 原值覆盖（仅在 grade 已成功生成时）
+  if (level !== "直播运营专员" && r.grade !== null) {
+    r.grade = level;
+  }
 }
 
 function computeVideoOps(emp: Employee, r: PositionResult): void {
+  const level = emp.level;
+  if (!level || !(VIDEO_OPS_LEVELS as readonly string[]).includes(level)) {
+    r.errors.push(`视频运营岗 level 必须为 ${VIDEO_OPS_LEVELS.join("/")}（收到: ${JSON.stringify(level)}）`);
+    return;
+  }
   computeWithPerCapitaMgmt(
     emp,
     r,
     VIDEO_OPS.personal,
     VIDEO_OPS.mgmt,
-    (v) => `季度月均净销售额(折算后) ${v} 万元 低于最低评级区间[30万)，需谈薪/人工处理`,
-    "视频运营岗",
+    (v) => `季度月均净销售额 ${v} 万元 低于最低评级区间[30万)，需谈薪/人工处理`,
   );
+  if (level === "视频运营组长" && r.grade !== null) {
+    r.grade = level;
+  }
 }
 
 const DISPATCH: Record<PositionKey, (emp: Employee, r: PositionResult) => void> = {

@@ -94,11 +94,10 @@ describe("calc engine — 28 边界用例（移植自 test_calc.py）", () => {
 });
 
 describe("calc engine — 直播运营/主播组长 + 视频运营 (总裁办〔2026〕9号)", () => {
-  it("直播运营-非官旗-中级+管理: perf=100, pcv=15 → 11000+1750=12800", () => {
+  it("直播运营专员-中级+管理: perf=100, pcv=15 → 11000+1750=12800", () => {
     const r = computeOne({
       position: "livestream_ops",
-      level: "直播运营",
-      account_type: "非官旗",
+      level: "直播运营专员",
       perf_personal: 100,
       per_capita_value: 15,
     });
@@ -109,52 +108,49 @@ describe("calc engine — 直播运营/主播组长 + 视频运营 (总裁办〔
     expect(r.raw_salary).toBe(12750);
   });
 
-  it("直播运营-官旗-折算后专家+管理: perf=700(×0.8=560)≥500, pcv=60 → 35000+4000=39000", () => {
+  it("直播运营专员-专家+管理: perf=600 (≥500 固定), pcv=60 → 35000+4000=39000", () => {
     const r = computeOne({
       position: "livestream_ops",
-      level: "直播运营",
-      account_type: "抖音官旗",
-      perf_personal: 700,
+      level: "直播运营专员",
+      perf_personal: 600,
       per_capita_value: 60,
     });
     expect(r.errors).toEqual([]);
     expect(r.grade).toBe("专家直播运营");
     expect(r.monthly_salary).toBe(39000);
-    expect(r.trace).toMatch(/官旗.*700.*×0\.8=560/);
   });
 
-  it("主播组长-官旗-中级+管理: perf=150(×0.8=120), pcv=40 → 12000+3000=15000", () => {
+  it("主播组长-中级+管理 grade 覆盖: perf=120, pcv=40 → salary=15000, grade=「主播组长」", () => {
     const r = computeOne({
       position: "livestream_ops",
       level: "主播组长",
-      account_type: "抖音官旗",
-      perf_personal: 150,
+      perf_personal: 120,
       per_capita_value: 40,
     });
     expect(r.errors).toEqual([]);
-    expect(r.grade).toBe("中级直播运营");
+    // 薪酬照算（与同 perf/pcv 的专员一致）
     expect(r.monthly_salary).toBe(15000);
+    // grade 被 level 原值覆盖
+    expect(r.grade).toBe("主播组长");
   });
 
-  it("直播运营-高级也计算管理薪资: perf=350, pcv=20 → 22500+2000=24500（验证高级不被忽略）", () => {
+  it("直播运营专员-高级也计算管理薪资: perf=350, pcv=20 → 22500+2000=24500", () => {
     const r = computeOne({
       position: "livestream_ops",
-      level: "直播运营",
-      account_type: "非官旗",
+      level: "直播运营专员",
       perf_personal: 350,
       per_capita_value: 20,
     });
     expect(r.errors).toEqual([]);
     expect(r.grade).toBe("高级直播运营");
-    // 高级也算管理薪资：22500 + 2000 = 24500
     expect(r.monthly_salary).toBe(24500);
     expect(r.trace).toMatch(/管理部分/);
   });
 
-  it("视频运营-中级+管理薪资低于最低档: perf=250, pcv=5 → 个人 14000、管理=0、notes 提示", () => {
+  it("视频运营专员-中级+管理薪资低于最低档: perf=250, pcv=5 → 个人 14000、管理=0、notes 提示", () => {
     const r = computeOne({
       position: "video_ops",
-      account_type: "非官旗",
+      level: "视频运营专员",
       perf_personal: 250,
       per_capita_value: 5,
     });
@@ -164,14 +160,48 @@ describe("calc engine — 直播运营/主播组长 + 视频运营 (总裁办〔
     expect(r.notes.join(" ")).toMatch(/人均净产值 5 万低于最低档/);
   });
 
-  it("视频运营-业绩低于最低区间: perf=20 → 报错", () => {
+  it("视频运营专员-业绩低于最低区间: perf=20 → 报错", () => {
     const r = computeOne({
       position: "video_ops",
-      account_type: "非官旗",
+      level: "视频运营专员",
       perf_personal: 20,
     });
     expect(r.grade).toBeNull();
     expect(r.monthly_salary).toBeNull();
     expect(r.errors.join(" ")).toMatch(/低于最低评级区间/);
+  });
+
+  it("直播运营组长-中级业绩+管理 grade 覆盖: perf=100, pcv=15 → salary=12800, grade=「直播运营组长」", () => {
+    const r = computeOne({
+      position: "livestream_ops",
+      level: "直播运营组长",
+      perf_personal: 100,
+      per_capita_value: 15,
+    });
+    expect(r.errors).toEqual([]);
+    expect(r.monthly_salary).toBe(12800);
+    expect(r.grade).toBe("直播运营组长");
+  });
+
+  it("直播运营专员-缺业绩: perf_personal 未填 → 报错", () => {
+    const r = computeOne({
+      position: "livestream_ops",
+      level: "直播运营专员",
+    });
+    expect(r.monthly_salary).toBeNull();
+    expect(r.errors.join(" ")).toMatch(/缺少必填字段.*perf_personal/);
+  });
+
+  it("视频运营组长-中级业绩+管理 grade 覆盖: perf=250, pcv=50 → salary=16000, grade=「视频运营组长」", () => {
+    const r = computeOne({
+      position: "video_ops",
+      level: "视频运营组长",
+      perf_personal: 250,
+      per_capita_value: 50,
+    });
+    expect(r.errors).toEqual([]);
+    // 个人 14000 + 管理 2000 = 16000
+    expect(r.monthly_salary).toBe(16000);
+    expect(r.grade).toBe("视频运营组长");
   });
 });
