@@ -8,6 +8,7 @@ import {
 import {
   BUSINESS,
   CROSS_BORDER,
+  JD_PRODUCT_OPS,
   LIVESTREAM,
   LIVESTREAM_INCENTIVE,
   LIVESTREAM_OPS,
@@ -280,6 +281,29 @@ function computeProduct(emp: Employee, r: PositionResult): void {
   finalize(r, emp, sal, b.formula === "fixed");
 }
 
+function computeJdProduct(emp: Employee, r: PositionResult): void {
+  const errors = r.errors;
+  // 管培生 / 助理 短路（与天猫拼多多一致）
+  if (eduOrAssistant(emp, r)) return;
+  const v = need(emp, "perf_personal", errors, "季度月均净销售额万元") as number | undefined;
+  if (v === undefined) return;
+  const b = findBracket(JD_PRODUCT_OPS, v);
+  if (!b) {
+    errors.push(`业绩 ${v} 万元 低于最低评级区间(20,50]万，需谈薪/人工处理`);
+    return;
+  }
+  r.grade = b.grade ?? null;
+  captureBracket(r, b);
+  const sal = salaryFromBracket(b, v);
+  r.raw_salary = sal;
+  if (b.formula === "fixed") {
+    r.trace = `${b.grade}: 固定${b.fixed}元`;
+  } else {
+    r.trace = traceOf(b, v);
+  }
+  finalize(r, emp, sal, b.formula === "fixed");
+}
+
 /**
  * 直播运营/主播组长 与 视频运营 共用：个人薪资 + 管理薪资 双轨叠加。
  * - per_capita_value 填了就匹配管理薪资区间表（不区分职级）；未填 → 不评管理薪资
@@ -380,6 +404,7 @@ const DISPATCH: Record<PositionKey, (emp: Employee, r: PositionResult) => void> 
   product_ops: computeProduct,
   livestream_ops: computeLivestreamOps,
   video_ops: computeVideoOps,
+  jd_product_ops: computeJdProduct,
 };
 
 export function computeOne(emp: Employee): PositionResult {
@@ -405,9 +430,6 @@ export function computeOne(emp: Employee): PositionResult {
     notes: [],
     errors: [...(emp.__parseErrors ?? [])],
     __rowIndex: emp.__rowIndex,
-    monthly_perf: emp.perf_personal !== undefined && emp.perf_personal !== null
-      ? emp.perf_personal / 3
-      : null,
     perf_bracket: null,
     salary_bracket: null,
     raw_salary: null,

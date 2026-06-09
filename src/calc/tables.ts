@@ -213,6 +213,17 @@ export const VIDEO_OPS = {
   ] as Bracket[],
 };
 
+// 9) 京东产品运营岗  总裁办〔2026〕10号  季度月均净销售额(万元)
+//    单表，区间左开右闭 (lo, hi]；除专家档固定外其余全部线性插值
+export const JD_PRODUCT_OPS: Bracket[] = [
+  { lo: 1000, hi: null, lo_inc: false, formula: "fixed", fixed: 45000, grade: "专家运营" },
+  { lo: 500, hi: 1000, lo_inc: false, hi_inc: true, sal_lo: 18000, sal_hi: 30000, grade: "高级运营" },
+  { lo: 200, hi: 500, lo_inc: false, hi_inc: true, sal_lo: 10000, sal_hi: 18000, grade: "中级运营" },
+  { lo: 100, hi: 200, lo_inc: false, hi_inc: true, sal_lo: 7000, sal_hi: 9000, grade: "中级运营" },
+  { lo: 50, hi: 100, lo_inc: false, hi_inc: true, sal_lo: 6000, sal_hi: 7000, grade: "初级运营" },
+  { lo: 20, hi: 50, lo_inc: false, hi_inc: true, sal_lo: 5000, sal_hi: 6000, grade: "初级运营" },
+];
+
 export const POSITIONS: Record<PositionKey, string> = {
   video_content: "视频内容岗",
   cross_border_ops: "跨境运营岗",
@@ -222,4 +233,5 @@ export const POSITIONS: Record<PositionKey, string> = {
   product_ops: "天猫/拼多多运营岗",
   livestream_ops: "直播运营/主播组长岗",
   video_ops: "视频运营岗",
+  jd_product_ops: "京东产品运营岗",
 };

@@ -6,7 +6,8 @@ export type PositionKey =
   | "livestream_host"
   | "product_ops"
   | "livestream_ops"
-  | "video_ops";
+  | "video_ops"
+  | "jd_product_ops";
 
 export interface Employee {
   name?: string;
@@ -65,8 +66,6 @@ export interface PositionResult {
   notes: string[];
   errors: string[];
   __rowIndex?: number;
-  /** perf_personal / 3，仅用于展示；缺 perf_personal 时为 null */
-  monthly_perf?: number | null;
   /** 命中的业绩核算区间（评级 bracket） */
   perf_bracket?: {
     lo: number | null;

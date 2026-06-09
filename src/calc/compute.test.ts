@@ -42,10 +42,9 @@ const CASES: Case[] = [
   { name: "产品运营-管培生本科", emp: { position: "product_ops", level: "管培生", education: "普通本科" }, grade: "运营管培生", salary: 6000, incentive: null },
 ];
 
-describe("calc engine — 新增展示字段 (monthly_perf / perf_bracket / salary_bracket / raw_salary)", () => {
+describe("calc engine — 新增展示字段 (perf_bracket / salary_bracket / raw_salary)", () => {
   it("跨境西安专员 perf=320 → 命中 [300,500) 插值，raw=21000", () => {
     const r = computeOne({ position: "cross_border_ops", region: "西安", level: "专员", perf_personal: 320 });
-    expect(r.monthly_perf).toBeCloseTo(106.6667, 3);
     expect(r.perf_bracket).toEqual({ lo: 300, hi: 500, lo_inc: true, hi_inc: false });
     expect(r.salary_bracket).toEqual({ sal_lo: 20000, sal_hi: 30000 });
     expect(r.raw_salary).toBe(21000);
@@ -58,16 +57,14 @@ describe("calc engine — 新增展示字段 (monthly_perf / perf_bracket / sala
     expect(r.raw_salary).toBe(15000);
   });
 
-  it("视频内容 perf=500 → monthly_perf≈166.67，区间仍按季度口径 [400,600)", () => {
+  it("视频内容 perf=500 → 命中 [400, 600) 区间", () => {
     const r = computeOne({ position: "video_content", perf_personal: 500 });
-    expect(r.monthly_perf).toBeCloseTo(166.6667, 3);
     expect(r.perf_bracket).toEqual({ lo: 400, hi: 600, lo_inc: true, hi_inc: false });
     expect(r.salary_bracket).toEqual({ sal_lo: 14000, sal_hi: 17000 });
   });
 
-  it("产品运营管培生本科 → 无 bracket，raw=6000，monthly_perf=null", () => {
+  it("产品运营管培生本科 → 无 bracket，raw=6000", () => {
     const r = computeOne({ position: "product_ops", level: "管培生", education: "普通本科" });
-    expect(r.monthly_perf).toBeNull();
     expect(r.perf_bracket).toBeNull();
     expect(r.salary_bracket).toBeNull();
     expect(r.raw_salary).toBe(6000);
@@ -203,5 +200,100 @@ describe("calc engine — 直播运营/主播组长 + 视频运营 (总裁办〔
     // 个人 14000 + 管理 2000 = 16000
     expect(r.monthly_salary).toBe(16000);
     expect(r.grade).toBe("视频运营组长");
+  });
+});
+
+describe("calc engine — 京东产品运营岗 (总裁办〔2026〕10号)", () => {
+  it("京东-专家固定: perf=1500 (>1000) → 专家运营、salary=45000（不取百）", () => {
+    const r = computeOne({
+      position: "jd_product_ops",
+      level: "专员",
+      perf_personal: 1500,
+    });
+    expect(r.errors).toEqual([]);
+    expect(r.grade).toBe("专家运营");
+    expect(r.monthly_salary).toBe(45000);
+  });
+
+  it("京东-高级插值上限: perf=1000 命中 (500, 1000] 右端 → salary=30000", () => {
+    const r = computeOne({
+      position: "jd_product_ops",
+      level: "专员",
+      perf_personal: 1000,
+    });
+    expect(r.errors).toEqual([]);
+    expect(r.grade).toBe("高级运营");
+    expect(r.raw_salary).toBe(30000);
+    expect(r.monthly_salary).toBe(30000);
+  });
+
+  it("京东-中级 perf=300 → 命中 (200, 500]，raw≈12666.67、salary=12700", () => {
+    const r = computeOne({
+      position: "jd_product_ops",
+      level: "专员",
+      perf_personal: 300,
+    });
+    expect(r.errors).toEqual([]);
+    expect(r.grade).toBe("中级运营");
+    expect(r.raw_salary).toBeCloseTo(12666.67, 1);
+    expect(r.monthly_salary).toBe(12700);
+  });
+
+  it("京东-初级 perf=30 → 命中 (20, 50]，raw≈5333.33、salary=5300", () => {
+    const r = computeOne({
+      position: "jd_product_ops",
+      level: "专员",
+      perf_personal: 30,
+    });
+    expect(r.errors).toEqual([]);
+    expect(r.grade).toBe("初级运营");
+    expect(r.raw_salary).toBeCloseTo(5333.33, 1);
+    expect(r.monthly_salary).toBe(5300);
+  });
+
+  it("京东-管培生本科: education=普通本科 → grade=运营管培生、salary=6000", () => {
+    const r = computeOne({
+      position: "jd_product_ops",
+      level: "管培生",
+      education: "普通本科",
+    });
+    expect(r.errors).toEqual([]);
+    expect(r.grade).toBe("运营管培生");
+    expect(r.monthly_salary).toBe(6000);
+  });
+
+  it("京东-助理: level=助理 → grade=运营助理、salary=null、notes 含谈薪制", () => {
+    const r = computeOne({
+      position: "jd_product_ops",
+      level: "助理",
+    });
+    expect(r.errors).toEqual([]);
+    expect(r.grade).toBe("运营助理");
+    expect(r.monthly_salary).toBeNull();
+    expect(r.notes.join(" ")).toMatch(/谈薪制/);
+  });
+
+  it("京东-业绩低于区间: perf=15 → 报错", () => {
+    const r = computeOne({
+      position: "jd_product_ops",
+      level: "专员",
+      perf_personal: 15,
+    });
+    expect(r.grade).toBeNull();
+    expect(r.monthly_salary).toBeNull();
+    expect(r.errors.join(" ")).toMatch(/低于最低评级区间/);
+  });
+
+  it("京东-试用期专员: perf=300, probation=true → 转正 12700、试用期 round100(12700×0.8)=10200", () => {
+    const r = computeOne({
+      position: "jd_product_ops",
+      level: "专员",
+      perf_personal: 300,
+      probation: true,
+    });
+    expect(r.errors).toEqual([]);
+    expect(r.grade).toBe("中级运营");
+    expect(r.std_salary).toBe(12700);
+    expect(r.monthly_salary).toBe(10200);
   });
 });
