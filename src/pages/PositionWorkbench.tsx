@@ -89,6 +89,8 @@ export default function PositionWorkbench() {
     dataIndex: f.key,
     key: f.key,
     width: Math.max(110, f.label.length * 14 + 24),
+    // 「姓名」列与「行号」列一起冻结在左侧，水平滚动时保持可见
+    ...(f.key === "name" ? { fixed: "left" as const } : {}),
     render: (v: unknown) => {
       if (v === undefined || v === null || v === "") return dash;
       if (typeof v === "boolean") return v ? "是" : "否";

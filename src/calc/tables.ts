@@ -38,7 +38,7 @@ export const CROSS_BORDER: Record<string, CrossBorderRegion> = {
       { lo: 1000, hi: 1500, sal_lo: 2000, sal_hi: 3000 },
       { lo: 500, hi: 1000, sal_lo: 1500, sal_hi: 2000 },
       { lo: 200, hi: 500, sal_lo: 1000, sal_hi: 1500 },
-      { lo: null, hi: 200, formula: "fixed", fixed: 500 },
+      { lo: 0, hi: 200, formula: "fixed", fixed: 500 },
     ],
     mgmt_min_span: 4,
   },
@@ -59,7 +59,7 @@ export const CROSS_BORDER: Record<string, CrossBorderRegion> = {
       { lo: 1000, hi: 1500, sal_lo: 2400, sal_hi: 3600 },
       { lo: 500, hi: 1000, sal_lo: 1800, sal_hi: 2400 },
       { lo: 200, hi: 500, sal_lo: 1200, sal_hi: 1800 },
-      { lo: null, hi: 200, formula: "fixed", fixed: 600 },
+      { lo: 0, hi: 200, formula: "fixed", fixed: 600 },
     ],
     mgmt_min_span: 4,
   },
@@ -144,7 +144,7 @@ export const LIVESTREAM_INCENTIVE: Bracket[] = [
   { lo: 20, hi: 25, rate: 0.015 },
   { lo: 15, hi: 20, rate: 0.014 },
   { lo: 10, hi: 15, rate: 0.012 },
-  { lo: null, hi: 10, rate: 0.010 },
+  { lo: 0, hi: 10, rate: 0.010 },
 ];
 
 // 6) 产品运营岗  总裁办〔2025〕23号 V2.0  (lo, hi]
