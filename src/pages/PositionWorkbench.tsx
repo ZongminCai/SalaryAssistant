@@ -4,30 +4,24 @@ import { Alert, Breadcrumb, Button, Empty, message, Space, Table, Tag, Upload } 
 import type { UploadProps } from "antd";
 import { DownloadOutlined, ExportOutlined, InboxOutlined, ReloadOutlined } from "@ant-design/icons";
 import { POSITION_CONFIGS } from "../positions/registry";
+import type { PositionConfig } from "../positions/registry";
 import type { PositionKey, PositionResult } from "../calc/types";
 import { computeAll } from "../calc/compute";
 import { formatBracket } from "../calc/engine";
 import { downloadTemplate } from "../excel/template";
 import { parseUpload } from "../excel/parse";
 import { exportResults } from "../excel/export";
+import { CS_CONFIGS } from "../cs/config";
+import type { CsPositionKey } from "../cs/types";
+import CustomerServiceWorkbench from "./CustomerServiceWorkbench";
 
 export default function PositionWorkbench() {
   const { positionKey } = useParams<{ positionKey: string }>();
+  // 客服接待岗走「队列评级」独立工作台（独立组件，各自持有自己的 hooks）
+  if (positionKey && positionKey in CS_CONFIGS) {
+    return <CustomerServiceWorkbench csKey={positionKey as CsPositionKey} />;
+  }
   const cfg = positionKey ? POSITION_CONFIGS[positionKey as PositionKey] : undefined;
-
-  const [results, setResults] = useState<PositionResult[] | null>(null);
-  const [fileErrors, setFileErrors] = useState<string[]>([]);
-  const [fileName, setFileName] = useState<string>("");
-
-  const stats = useMemo(() => {
-    if (!results) return null;
-    const total = results.length;
-    const errored = results.filter((r) => r.errors.length > 0).length;
-    const ok = total - errored;
-    const withSalary = results.filter((r) => r.monthly_salary !== null).length;
-    return { total, errored, ok, withSalary };
-  }, [results]);
-
   if (!cfg) {
     return (
       <Alert
@@ -42,6 +36,22 @@ export default function PositionWorkbench() {
       />
     );
   }
+  return <PerfWorkbench cfg={cfg} />;
+}
+
+function PerfWorkbench({ cfg }: { cfg: PositionConfig }) {
+  const [results, setResults] = useState<PositionResult[] | null>(null);
+  const [fileErrors, setFileErrors] = useState<string[]>([]);
+  const [fileName, setFileName] = useState<string>("");
+
+  const stats = useMemo(() => {
+    if (!results) return null;
+    const total = results.length;
+    const errored = results.filter((r) => r.errors.length > 0).length;
+    const ok = total - errored;
+    const withSalary = results.filter((r) => r.monthly_salary !== null).length;
+    return { total, errored, ok, withSalary };
+  }, [results]);
 
   const uploadProps: UploadProps = {
     accept: ".xlsx,.xls",

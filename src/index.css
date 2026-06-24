@@ -57,6 +57,20 @@ body {
   color: #6b7280;
   font-size: 14px;
 }
+.home-group-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 16px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.home-group-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: #9ca3af;
+}
 .position-card {
   min-height: 100%;
   box-sizing: border-box;
