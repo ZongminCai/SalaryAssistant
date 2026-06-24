@@ -15,6 +15,9 @@ body {
   flex-direction: column;
 }
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   background: #fff;
   padding: 14px 32px;
   border-bottom: 1px solid #ebedf2;
