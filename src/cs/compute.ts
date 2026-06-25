@@ -106,23 +106,31 @@ function newResult(emp: CsEmployee, cfg: CsPositionConfig): CsResult {
   };
 }
 
-/** 把月度数组校验为「长度为 MONTH_COUNT 且每月均为有限非负数」 */
-function fullMonthlyArr(arr: (number | undefined)[] | undefined): number[] | null {
+/** 返回月度数组（保留 undefined 表示缺月）；若数组长度不对或完全无数据返回 null */
+function partialMonthlyArr(arr: (number | undefined)[] | undefined): (number | undefined)[] | null {
   if (!arr || arr.length !== MONTH_COUNT) return null;
-  const out: number[] = [];
-  for (const v of arr) {
-    if (v === undefined || !Number.isFinite(v)) return null;
-    out.push(v);
-  }
-  return out;
+  if (arr.every((v) => v === undefined || !Number.isFinite(v))) return null;
+  return arr;
+}
+
+/** 检查月度数组是否完整（每月均有有效值） */
+function isFullMonthly(arr: (number | undefined)[]): arr is number[] {
+  return arr.every((v) => v !== undefined && Number.isFinite(v));
+}
+
+/** 有效月份数 */
+function validMonthCount(arr: (number | undefined)[]): number {
+  return arr.filter((v) => v !== undefined && Number.isFinite(v)).length;
 }
 
 interface ValidEmp {
   emp: CsEmployee;
   gc: CsGroupConfig;
-  v1: number[]; // ind1 月度值，长度 MONTH_COUNT
-  v2: number[]; // ind2 月度值，长度 MONTH_COUNT
-  rec: number[]; // 接待量月度值，长度 MONTH_COUNT
+  v1: (number | undefined)[]; // ind1 月度值，长度 MONTH_COUNT（缺月为 undefined）
+  v2: (number | undefined)[]; // ind2 月度值
+  rec: (number | undefined)[]; // 接待量月度值
+  /** 三项数据（ind1/ind2/reception）均完整（3 个月齐全）→ 可参与完整评级 */
+  complete: boolean;
 }
 
 /** 校验并返回月度数据；失败返回 null */
@@ -138,14 +146,16 @@ function validate(emp: CsEmployee, cfg: CsPositionConfig, r: CsResult): ValidEmp
     }
     return null;
   }
-  const v1 = fullMonthlyArr(emp.values[gc.ind1.label]);
-  const v2 = fullMonthlyArr(emp.values[gc.ind2.label]);
-  const rec = fullMonthlyArr(emp.reception);
-  if (!v1) r.errors.push(`指标「${gc.ind1.label}」需分别填写 月1 / 月2 / 月3 三个月数据`);
-  if (!v2) r.errors.push(`指标「${gc.ind2.label}」需分别填写 月1 / 月2 / 月3 三个月数据`);
-  if (!rec) r.errors.push("「接待量」需分别填写 月1 / 月2 / 月3 三个月数据");
+  // 允许部分缺月：只要有至少 1 个月的数据就通过，完全无数据才报错
+  const v1 = partialMonthlyArr(emp.values[gc.ind1.label]);
+  const v2 = partialMonthlyArr(emp.values[gc.ind2.label]);
+  const rec = partialMonthlyArr(emp.reception);
+  if (!v1) r.errors.push(`指标「${gc.ind1.label}」至少需要 1 个月的有效数据`);
+  if (!v2) r.errors.push(`指标「${gc.ind2.label}」至少需要 1 个月的有效数据`);
+  if (!rec) r.errors.push("「接待量」至少需要 1 个月的有效数据");
   if (r.errors.length > 0) return null;
-  return { emp, gc, v1: v1 as number[], v2: v2 as number[], rec: rec as number[] };
+  const complete = isFullMonthly(v1!) && isFullMonthly(v2!) && isFullMonthly(rec!);
+  return { emp, gc, v1: v1!, v2: v2!, rec: rec!, complete };
 }
 
 function lvlName(cfg: CsPositionConfig, level: CsLevel): string {
@@ -193,16 +203,31 @@ export function computeCs(
   }
   for (const u of units.values()) {
     for (let m = 0; m < MONTH_COUNT; m++) {
-      u.ind1Means.push(avg(u.members.map((x) => x.v.v1[m])));
-      u.ind2Means.push(avg(u.members.map((x) => x.v.v2[m])));
-      u.receptionMeans.push(avg(u.members.map((x) => x.v.rec[m])));
+      const v1Vals = u.members.map((x) => x.v.v1[m]).filter((v): v is number => v !== undefined && Number.isFinite(v));
+      const v2Vals = u.members.map((x) => x.v.v2[m]).filter((v): v is number => v !== undefined && Number.isFinite(v));
+      const recVals = u.members.map((x) => x.v.rec[m]).filter((v): v is number => v !== undefined && Number.isFinite(v));
+      u.ind1Means.push(v1Vals.length > 0 ? avg(v1Vals) : 0);
+      u.ind2Means.push(v2Vals.length > 0 ? avg(v2Vals) : 0);
+      u.receptionMeans.push(recVals.length > 0 ? avg(recVals) : 0);
     }
   }
 
-  // 4) 月度完成率（120% 封顶）→ 季度均值
+  // 4) 月度完成率（120% 封顶）→ 季度均值（仅对有数据月份求均值）
   for (const [r, v] of validByEmp) {
     const u = units.get(unitKeyOf(r)) as UnitAgg;
-    if (u.ind1Means.some((m) => m <= 0) || u.ind2Means.some((m) => m <= 0)) {
+    // 计算有效月份数
+    const vm = Math.min(validMonthCount(v.v1), validMonthCount(v.v2), validMonthCount(v.rec));
+    r.validMonths = vm;
+
+    // 检查有数据月份的均值是否为 0（无法计算完成率）
+    const hasZeroMean = (() => {
+      for (let m = 0; m < MONTH_COUNT; m++) {
+        if (v.v1[m] !== undefined && u.ind1Means[m] <= 0) return true;
+        if (v.v2[m] !== undefined && u.ind2Means[m] <= 0) return true;
+      }
+      return false;
+    })();
+    if (hasZeroMean) {
       r.errors.push("评级单元月度指标均值为 0，无法计算完成率");
       validByEmp.delete(r);
       continue;
@@ -210,13 +235,14 @@ export function computeCs(
 
     const buildDetail = (
       ind: CsIndicator,
-      values: number[],
+      values: (number | undefined)[],
       means: number[],
     ): CsIndicatorDetail => {
       const monthly: CsMonthlyRate[] = [];
       for (let m = 0; m < MONTH_COUNT; m++) {
-        const { rate, capped } = monthlyRateCapped(ind, values[m], means[m]);
-        monthly.push({ value: values[m], mean: means[m], rate, capped });
+        if (values[m] === undefined || !Number.isFinite(values[m])) continue;
+        const { rate, capped } = monthlyRateCapped(ind, values[m] as number, means[m]);
+        monthly.push({ value: values[m] as number, mean: means[m], rate, capped });
       }
       return {
         label: ind.label,
@@ -232,16 +258,19 @@ export function computeCs(
     r.ind2 = buildDetail(v.gc.ind2, v.v2, u.ind2Means);
     r.combinedRate = r.ind1.rate * r.ind1.weight + r.ind2.rate * r.ind2.weight;
 
-    // 接待量：月度明细 + 季度均值口径
+    // 接待量：仅对有数据月份计算
     const receptionMonthly: CsReceptionMonthly[] = [];
     for (let m = 0; m < MONTH_COUNT; m++) {
-      const value = v.rec[m];
+      if (v.rec[m] === undefined || !Number.isFinite(v.rec[m])) continue;
+      const value = v.rec[m] as number;
       const mean = u.receptionMeans[m];
       const threshold = mean * RECEPTION_FACTOR;
       receptionMonthly.push({ value, mean, threshold, ok: value >= threshold });
     }
-    const receptionAvg = avg(v.rec);
-    const receptionMeanAvg = avg(u.receptionMeans);
+    const recValues = v.rec.filter((x): x is number => x !== undefined && Number.isFinite(x));
+    const receptionAvg = avg(recValues);
+    const recMeanValues = receptionMonthly.map((rm) => rm.mean);
+    const receptionMeanAvg = avg(recMeanValues);
     r.receptionMonthly = receptionMonthly;
     r.reception = receptionAvg;
     r.receptionMean = receptionMeanAvg;
@@ -249,10 +278,11 @@ export function computeCs(
     r.receptionOk = receptionAvg >= r.receptionThreshold;
   }
 
-  // 5) 参评比例（按 rankKey/部门）——仅 participate=true 计入排名池
+  // 5) 参评比例（按 rankKey/部门）——仅 complete=true && participate=true 计入排名池
   const rankPools = new Map<string, CsResult[]>();
-  for (const [r] of validByEmp) {
+  for (const [r, v] of validByEmp) {
     if (!r.participate) continue;
+    if (!v.complete) continue;
     const key = rankKeyOf(r);
     const arr = rankPools.get(key) ?? [];
     arr.push(r);
@@ -309,20 +339,31 @@ export function computeCs(
     }
   }
 
-  // 7) 定级 + 定薪（仅 participate=true；participate=false 仅输出明细，不定级不定薪）
+  // 7) 定级 + 定薪（仅 complete=true && participate=true 才完整评级）
   for (const [r, v] of validByEmp) {
+    const monthlyDesc = (d: CsIndicatorDetail) =>
+      d.monthly
+        .map((mm, i) => `${i + 1}月${pct(mm.rate)}${mm.capped ? "(封顶)" : ""}`)
+        .join("/");
+
     if (!r.participate) {
       r.notes.push("本人不参与评级定薪，仅作为单元均值样本");
-      const monthlyDesc = (d: CsIndicatorDetail) =>
-        d.monthly
-          .map((mm, i) => `${i + 1}月${pct(mm.rate)}${mm.capped ? "(封顶)" : ""}`)
-          .join("/");
       const d1 = r.ind1 as CsIndicatorDetail;
       const d2 = r.ind2 as CsIndicatorDetail;
       r.trace =
         `完成率: ${d1.label}[${monthlyDesc(d1)}]→季度${pct(d1.rate)}×${d1.weight}` +
         ` + ${d2.label}[${monthlyDesc(d2)}]→季度${pct(d2.rate)}×${d2.weight}` +
         ` → 综合${pct(r.combinedRate as number)}；参评定薪=否，不入排名池`;
+      continue;
+    }
+    if (!v.complete) {
+      r.notes.push(`本人数据不完整（仅有${r.validMonths}个月），仅作为单元均值样本，不参与排名/定级/定薪`);
+      const d1 = r.ind1 as CsIndicatorDetail;
+      const d2 = r.ind2 as CsIndicatorDetail;
+      r.trace =
+        `完成率: ${d1.label}[${monthlyDesc(d1)}]→季度${pct(d1.rate)}×${d1.weight}` +
+        ` + ${d2.label}[${monthlyDesc(d2)}]→季度${pct(d2.rate)}×${d2.weight}` +
+        ` → 综合${pct(r.combinedRate as number)}；数据不完整(${r.validMonths}/3月)，不入排名池`;
       continue;
     }
     const dept = rankKeyOf(r);
@@ -336,9 +377,9 @@ export function computeCs(
 
     const d1 = r.ind1 as CsIndicatorDetail;
     const d2 = r.ind2 as CsIndicatorDetail;
-    // 基准线口径：3 个月均值
-    const v1Avg = avg(v.v1);
-    const v2Avg = avg(v.v2);
+    // 基准线口径：有效月份均值（complete=true 时即 3 个月均值）
+    const v1Avg = avg(v.v1.filter((x): x is number => x !== undefined));
+    const v2Avg = avg(v.v2.filter((x): x is number => x !== undefined));
     const dropReasons: string[] = [];
 
     let level: CsLevel = ceiling;
@@ -374,10 +415,6 @@ export function computeCs(
     r.monthlySalary = round100(raw);
 
     // trace
-    const monthlyDesc = (d: CsIndicatorDetail) =>
-      d.monthly
-        .map((mm, i) => `${i + 1}月${pct(mm.rate)}${mm.capped ? "(封顶)" : ""}`)
-        .join("/");
     const rateStr =
       `完成率: ${d1.label}[${monthlyDesc(d1)}]→季度${pct(d1.rate)}×${d1.weight}` +
       ` + ${d2.label}[${monthlyDesc(d2)}]→季度${pct(d2.rate)}×${d2.weight}` +

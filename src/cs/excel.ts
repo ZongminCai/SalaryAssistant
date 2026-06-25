@@ -61,7 +61,7 @@ export function buildCsTemplate(cfg: CsPositionConfig): ArrayBuffer {
       ["天猫·售前服务组（官旗/综合）", "转化率 / 响应时间"],
       ["天猫·物流速询/标准/专业/优+服务组", "客户满意度 / 响应时间"],
       ["抖音·客服一组-售前组", "转化率 / 响应时间"],
-      ["抖音·客服一/二组-售后组、综合组（快手）", "客户满意度 / 响应时间"],
+      ["抖音·客服一组-售后组、客服二组-售后组、综合组（快手）", "客户满意度 / 响应时间"],
       ["抖音·客服二组-综合组（京东）", "客户满意度 / 转化率（均正向，无响应时间）"],
       ["拼多多·客服二组（售后）、综合组（售前+售后）", "客服服务分 / 响应时间"],
       ["拼多多·客服一组-售前组", "转化率 / 响应时间"],
@@ -233,6 +233,7 @@ function csResultRow(r: CsResult, hasDeptGroup: boolean): unknown[] {
   const recMonthly = r.receptionMonthly ? r.receptionMonthly.map((m) => m.value).join(" / ") : "";
   row.push(
     r.participate ? "是" : "否",
+    r.validMonths !== undefined ? `${r.validMonths}/${MONTH_COUNT}` : "",
     r.ind1 ? r.ind1.label : "",
     joinMonthlyValues(r.ind1),
     joinMonthlyMeans(r.ind1),
@@ -272,6 +273,7 @@ export function exportCsResults(out: CsComputeOutput, cfg: CsPositionConfig): vo
   if (hasDeptGroup) header.push("部门", "组别");
   header.push(
     "参评定薪",
+    "有效月份",
     "指标1",
     `指标1值(${monthsTag})`,
     `指标1均值(${monthsTag})`,

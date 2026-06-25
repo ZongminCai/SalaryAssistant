@@ -185,6 +185,8 @@ export interface CsResult {
   expertAdvance?: boolean;
   /** 是否参与评级定薪（true=参评，false=仅用于单元均值） */
   participate: boolean;
+  /** 有效月份数（1~3；3 表示数据完整，可参与完整评级流程） */
+  validMonths?: number;
 
   /** 最终级别对应薪资区间 */
   salaryBand?: { lo: number; hi: number } | null;

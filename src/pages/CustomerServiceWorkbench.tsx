@@ -57,7 +57,7 @@ export default function CustomerServiceWorkbench({ csKey }: { csKey: CsPositionK
   const [fileName, setFileName] = useState<string>("");
   const [headcounts, setHeadcounts] = useState<Record<string, number | undefined>>({});
 
-  // 检测到的部门（有数据行的部门）+ 默认参评人数（仅含 participate 不为 false的员工）
+  // 检测到的部门（有数据行的部门）+ 参评标记为「是」的员工数（含缺月员工，实际排名池在 compute 中按数据完整性再筛）
   const deptParticipants = useMemo(() => {
     const m: Record<string, number> = {};
     if (!employees) return m;
@@ -155,9 +155,15 @@ export default function CustomerServiceWorkbench({ csKey }: { csKey: CsPositionK
       render: (v: boolean) => v
         ? <Tag color="green">是</Tag>
         : <Tag color="default">否</Tag> },
+    { title: "有效月份", dataIndex: "validMonths", key: "validMonths", width: 80,
+      render: (v: number | undefined) => {
+        if (v === undefined) return dash;
+        if (v < 3) return <Tag color="orange">{v}/3</Tag>;
+        return <span>{v}/3</span>;
+      } },
     { title: "指标1", key: "ind1", width: 220, render: (_: unknown, r: CsResult) => indicatorCell(r.ind1) },
     { title: "指标2", key: "ind2", width: 220, render: (_: unknown, r: CsResult) => indicatorCell(r.ind2) },
-    { title: "综合完成率(季度)", dataIndex: "combinedRate", key: "combinedRate", width: 110,
+    { title: "综合完成率(季度)", dataIndex: "combinedRate", key: "combinedRate", width: 140,
       render: (v: number | null) => (v === null ? dash : <strong>{(v * 100).toFixed(1)}%</strong>) },
     { title: "接待量", key: "reception", width: 200, render: (_: unknown, r: CsResult) =>
         r.reception === undefined ? dash : (
@@ -337,7 +343,7 @@ export default function CustomerServiceWorkbench({ csKey }: { csKey: CsPositionK
             columns={columns}
             dataSource={output.results}
             scroll={{ x: "max-content" }}
-            pagination={{ pageSize: 30, showSizeChanger: true }}
+            pagination={{ defaultPageSize: 30, showSizeChanger: true, pageSizeOptions: [10, 20, 30, 50, 100] }}
             rowClassName={(r) => (r.errors.length > 0 ? "row-error" : "")}
           />
         )}

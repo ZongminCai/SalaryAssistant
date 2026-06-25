@@ -161,8 +161,8 @@ describe("吉林分部客服接待岗 — 部门/组别校验", () => {
   });
 });
 
-describe("新规则1 — 月度数据完整性", () => {
-  it("缺任一月份 → 报错；不进入计算", () => {
+describe("新规则1 — 缺月数据支持", () => {
+  it("缺月员工：不报错、参与单元均值、但不参与排名/定级/定薪", () => {
     const employees = [
       ecomEmp({ name: "A", sat: [96, undefined, 96], conv: rep(56), rec: rep(1000) }),
       ecomEmp({ name: "B", sat: rep(94), conv: rep(54), rec: [1000, 1000, undefined] }),
@@ -172,13 +172,53 @@ describe("新规则1 — 月度数据完整性", () => {
     const a = out.results.find((r) => r.name === "A")!;
     const b = out.results.find((r) => r.name === "B")!;
     const c = out.results.find((r) => r.name === "C")!;
-    expect(a.errors.join(" ")).toMatch(/客户满意度.*月1.*月2.*月3/);
-    expect(a.combinedRate).toBeNull();
-    expect(b.errors.join(" ")).toMatch(/接待量.*月1.*月2.*月3/);
-    expect(b.combinedRate).toBeNull();
+    // A 缺月但不报错
+    expect(a.errors).toEqual([]);
+    expect(a.combinedRate).not.toBeNull();
+    expect(a.validMonths).toBe(2);
+    expect(a.rank).toBeUndefined();
+    expect(a.grade).toBeNull();
+    expect(a.monthlySalary).toBeNull();
+    expect(a.notes.join(" ")).toMatch(/数据不完整/);
+    // B 缺月但不报错
+    expect(b.errors).toEqual([]);
+    expect(b.combinedRate).not.toBeNull();
+    expect(b.validMonths).toBe(2);
+    expect(b.rank).toBeUndefined();
+    expect(b.grade).toBeNull();
+    expect(b.monthlySalary).toBeNull();
     // C 数据完整 → 正常评估
     expect(c.errors).toEqual([]);
     expect(c.combinedRate).not.toBeNull();
+    expect(c.validMonths).toBe(3);
+    expect(c.rank).toBeDefined();
+    expect(c.grade).not.toBeNull();
+  });
+
+  it("缺月员工的数据参与了对应月份的单元均值", () => {
+    // A 只有月1/月3 数据(sat=120)，C 有全部3个月(sat=80)
+    // 月1均值=(120+80)/2=100; 月2均值=80(仅C); 月3均值=(120+80)/2=100
+    const employees = [
+      ecomEmp({ name: "A", sat: [120, undefined, 120], conv: [60, undefined, 60], rec: [1000, undefined, 1000] }),
+      ecomEmp({ name: "C", sat: rep(80), conv: rep(40), rec: rep(1000) }),
+    ];
+    const out = computeCs(employees, ECOM, { 电商四部: 2 });
+    const c = out.results.find((r) => r.name === "C")!;
+    // C 的月1 sat 均值应为(120+80)/2=100，月2 均值应为 80（仅C自己）
+    expect(c.ind1!.monthly[0].mean).toBeCloseTo(100, 6);
+    expect(c.ind1!.monthly[1].mean).toBeCloseTo(80, 6);
+    expect(c.ind1!.monthly[2].mean).toBeCloseTo(100, 6);
+  });
+
+  it("所有月份均为空 → 仍报错", () => {
+    const employees = [
+      ecomEmp({ name: "A", sat: [undefined, undefined, undefined], conv: rep(56), rec: rep(1000) }),
+    ];
+    const out = computeCs(employees, ECOM, { 电商四部: 1 });
+    const a = out.results.find((r) => r.name === "A")!;
+    expect(a.errors.length).toBeGreaterThan(0);
+    expect(a.errors.join(" ")).toMatch(/客户满意度/);
+    expect(a.combinedRate).toBeNull();
   });
 });
 
