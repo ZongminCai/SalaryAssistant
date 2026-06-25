@@ -143,8 +143,8 @@ const PARTICIPATE_COL: CsColumn = { key: "participate", label: "是否参与评�
 
 const ECOM4_COLUMNS: CsColumn[] = buildColumns([
   NAME_COL,
-  { key: "v_sat", label: "客户满意度", kind: "indicator", unit: "%", required: true, comment: "指标1（权重40%）。分别填写月１/月２/月３ 的百分数数值，如 96 表示 96%；按月计算完成率（≤120% 封顶）后取 3 月均值", example: 96 },
-  { key: "v_conv", label: "转化率", kind: "indicator", unit: "%", required: true, comment: "指标2（权重60%）。分别填写月１/月２/月３ 的百分数数值，如 56 表示 56%；按月计算完成率（≤120% 封顶）后取 3 月均值", example: 56 },
+  { key: "v_sat", label: "客户满意度", kind: "indicator", unit: "%", required: true, comment: "指标1（权重40%）。分别填写月１/月２/月３ 的小数，如 0.96 表示 96%；系统自动×100 后按月计算完成率（≤120% 封顶）再取 3 月均值", example: 0.96 },
+  { key: "v_conv", label: "转化率", kind: "indicator", unit: "%", required: true, comment: "指标2（权重60%）。分别填写月１/月２/月３ 的小数，如 0.56 表示 56%；系统自动×100 后按月计算完成率（≤120% 封顶）再取 3 月均值", example: 0.56 },
   RECEPTION_COL,
   EXPERT_COL,
   PARTICIPATE_COL,
@@ -157,8 +157,8 @@ const JILIN_COLUMNS: CsColumn[] = buildColumns([
     enum: Array.from(new Set(JILIN_GROUPS.map((g) => g.group as string))),
     comment: "必填：本部门下的组别（须与部门匹配，详见填写说明）", example: "售前服务组（官旗）" },
   // 指标列超集：每人按其组别只填对应的 2 列，每列再分月1/月2/月3 三列；其余留空
-  { key: "v_conv", label: "转化率", kind: "indicator", unit: "%", required: false, comment: "正向指标。分别填写月1/月2/月3 的百分数数值（如 46 表示 46%）；按月计算后取 3 月均值", example: 46 },
-  { key: "v_sat", label: "客户满意度", kind: "indicator", unit: "%", required: false, comment: "正向指标。分别填写月1/月2/月3 的百分数数值（如 96 表示 96%）；按月计算后取 3 月均值", example: "" },
+  { key: "v_conv", label: "转化率", kind: "indicator", unit: "%", required: false, comment: "正向指标。分别填写月1/月2/月3 的小数（如 0.46 表示 46%）；系统自动×100 后按月计算再取 3 月均值", example: 0.46 },
+  { key: "v_sat", label: "客户满意度", kind: "indicator", unit: "%", required: false, comment: "正向指标。分别填写月1/月2/月3 的小数（如 0.96 表示 96%）；系统自动×100 后按月计算再取 3 月均值", example: "" },
   { key: "v_score", label: "客服服务分", kind: "indicator", unit: "分", required: false, comment: "正向指标。分别填写月1/月2/月3 的服务分（如 3.5）；按月计算后取 3 月均值", example: "" },
   { key: "v_resp", label: "响应时间", kind: "indicator", unit: "秒", required: false, comment: "逆向指标（越小越好）。分别填写月1/月2/月3 的响应秒数（如 15）；按月计算后取 3 月均值", example: 15 },
   RECEPTION_COL,

@@ -72,7 +72,7 @@ export function buildCsTemplate(cfg: CsPositionConfig): ArrayBuffer {
     [],
     ["通用规则"],
     [`· 每个指标与接待量都已展开为 ${MONTH_LABELS.join(" / ")} 三列，必须分别填写三个月的数据。`],
-    ["· 指标值按方案口径填写：满意度/转化率填百分数的数值（如 96、56），响应时间填秒，客服服务分填分值。"],
+    ["· 指标值按方案口径填写：满意度/转化率填小数（如 0.96 表示 96%、0.56 表示 56%，系统自动×100），响应时间填秒，客服服务分填分值。"],
     ["· 每人只需填本组别对应的 2 个指标（各 3 列月1/月2/月3），其余指标列留空。"],
     ["· 系统按月计算完成率，单项指标超过 120% 一律按 120% 计；取 3 个月均值为季度完成率。"],
     ["· 接待量为必填；系统按三月均值与评级单元季度均值×80% 比较作为中级及以上门槛。"],
@@ -175,7 +175,7 @@ export async function parseCsUpload(file: File, cfg: CsPositionConfig): Promise<
               { length: MONTH_COUNT },
               () => undefined as number | undefined,
             ));
-            arr[m] = n;
+            arr[m] = c.unit === "%" ? +(n * 100).toFixed(10) : n;
           }
           break;
         }

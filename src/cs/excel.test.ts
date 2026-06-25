@@ -38,8 +38,8 @@ describe("客服 Excel 模板 → 解析 → 计算 圆环", () => {
     const cfg = CS_CONFIGS.ecom4_cs;
     // 列顺序：姓名, 客户满意度-月1/2/3, 转化率-月1/2/3, 接待量-月1/2/3, 专家进阶达成
     const ab = writeRows(cfg, [
-      ["甲", 96, 96, 96, 56, 56, 56, 1000, 1000, 1000, "否"],
-      ["乙", 94, 94, 94, 52, 52, 52, 1000, 1000, 1000, "否"],
+      ["甲", 0.96, 0.96, 0.96, 0.56, 0.56, 0.56, 1000, 1000, 1000, "否"],
+      ["乙", 0.94, 0.94, 0.94, 0.52, 0.52, 0.52, 1000, 1000, 1000, "否"],
     ]);
     const { employees, fileErrors } = await parseCsUpload(fileFromAb(ab, "ecom4.xlsx"), cfg);
     expect(fileErrors).toEqual([]);
@@ -57,7 +57,7 @@ describe("客服 Excel 模板 → 解析 → 计算 圆环", () => {
     // 列顺序：姓名, 部门, 组别, 转化率×3, 客户满意度×3, 客服服务分×3, 响应时间×3, 接待量×3, 专家进阶达成
     const ab = writeRows(cfg, [[
       "丙", "抖音", "客服一组-售前组",
-      50, 50, 50,
+      0.50, 0.50, 0.50,
       "", "", "",
       "", "", "",
       12, 12, 12,
@@ -83,7 +83,7 @@ describe("客服 Excel 模板 → 解析 → 计算 圆环", () => {
   it("电商四部：月2 接待量留空 → parseCsUpload 能读出部分月份；computeCs 视为缺月员工不参与评级", async () => {
     const cfg = CS_CONFIGS.ecom4_cs;
     const ab = writeRows(cfg, [
-      ["丁", 96, 96, 96, 56, 56, 56, 1000, "", 1000, "否"],
+      ["丁", 0.96, 0.96, 0.96, 0.56, 0.56, 0.56, 1000, "", 1000, "否"],
     ]);
     const { employees, fileErrors } = await parseCsUpload(fileFromAb(ab, "ecom4-miss.xlsx"), cfg);
     expect(fileErrors).toEqual([]);
@@ -101,8 +101,8 @@ describe("客服 Excel 模板 → 解析 → 计算 圆环", () => {
     const cfg = CS_CONFIGS.ecom4_cs;
     // 列序：姓名, 客户满意度-月1/2/3, 转化率-月1/2/3, 接待量-月1/2/3, 专家进阶达成, 是否参与评级定薪
     const ab = writeRows(cfg, [
-      ["甲", 96, 96, 96, 56, 56, 56, 1000, 1000, 1000, "否", "是"],
-      ["乙", 94, 94, 94, 54, 54, 54, 1000, 1000, 1000, "否", "否"],
+      ["甲", 0.96, 0.96, 0.96, 0.56, 0.56, 0.56, 1000, 1000, 1000, "否", "是"],
+      ["乙", 0.94, 0.94, 0.94, 0.54, 0.54, 0.54, 1000, 1000, 1000, "否", "否"],
     ]);
     const { employees, fileErrors } = await parseCsUpload(fileFromAb(ab, "ecom4-np.xlsx"), cfg);
     expect(fileErrors).toEqual([]);
