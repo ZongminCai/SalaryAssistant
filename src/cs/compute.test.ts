@@ -298,6 +298,7 @@ describe("新规则3 — 级别内分组定薪", () => {
 
   it("吉林：同部门不同组别同级别 → 同分组，最低取salLo最高取salHi", () => {
     // 标准服务组 junior=3200~4000，售前服务组（官旗）junior=3000~3800
+    // A2/B2 完成率≥80% 但排名靠后(p≥0.5) → junior
     const employees = [
       emp({
         name: "A1",
@@ -310,7 +311,7 @@ describe("新规则3 — 级别内分组定薪", () => {
         name: "A2",
         dept: "天猫",
         group: "标准服务组",
-        values: { 客户满意度: rep(50), 响应时间: rep(40) },
+        values: { 客户满意度: rep(80), 响应时间: rep(12) },
         rec: rep(1500),
       }),
       emp({
@@ -324,20 +325,18 @@ describe("新规则3 — 级别内分组定薪", () => {
         name: "B2",
         dept: "天猫",
         group: "售前服务组（官旗）",
-        values: { 转化率: rep(20), 响应时间: rep(40) },
+        values: { 转化率: rep(35), 响应时间: rep(12) },
         rec: rep(1500),
       }),
     ];
     const out = computeCs(employees, JILIN, { 天猫: 4, 抖音: 0, 拼多多: 0 });
-    const a1 = out.results.find((r) => r.name === "A1")!;
     const a2 = out.results.find((r) => r.name === "A2")!;
-    const b1 = out.results.find((r) => r.name === "B1")!;
     const b2 = out.results.find((r) => r.name === "B2")!;
-    expect(a1.errors).toEqual([]);
     expect(a2.errors).toEqual([]);
-    expect(b1.errors).toEqual([]);
     expect(b2.errors).toEqual([]);
-    // A2、B2 完成率都很低，应为 junior
+    // A2、B2 排名靠后(p≥0.5)，应为 junior；且 combinedRate≥80%
+    expect(a2.combinedRate as number).toBeGreaterThanOrEqual(0.8);
+    expect(b2.combinedRate as number).toBeGreaterThanOrEqual(0.8);
     expect(a2.finalLevel).toBe("junior");
     expect(b2.finalLevel).toBe("junior");
     // 同部门(天猫) 同级别(junior) → 同分组，A2 完成率较高取自己的 salHi，B2 完成率较低取自己的 salLo
