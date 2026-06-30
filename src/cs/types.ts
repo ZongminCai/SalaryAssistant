@@ -149,6 +149,10 @@ export interface CsResult {
 
   ind1?: CsIndicatorDetail;
   ind2?: CsIndicatorDetail;
+  /** 指标1 原始值季度均值（有数据月份算术平均） */
+  ind1Avg?: number;
+  /** 指标2 原始值季度均值（有数据月份算术平均） */
+  ind2Avg?: number;
   /** 综合完成率（加权） */
   combinedRate: number | null;
 

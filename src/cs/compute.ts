@@ -26,7 +26,6 @@ const LEVEL_LOWER: Record<CsLevel, CsLevel> = {
   junior: "junior",
 };
 
-const RATE_LO = 0.8;
 const RATE_HI = 1.2;
 const RECEPTION_FACTOR = 0.8;
 
@@ -66,21 +65,6 @@ function baselineOk(ind: CsIndicator, valueAvg: number, base: number | undefined
 
 function levelSpec(gc: CsGroupConfig, level: CsLevel): CsLevelSpec {
   return gc[level];
-}
-
-/**
- * 线性插值薪资：
- * - 综合完成率 ≥ 80% 时，按 (rate-80%) × 区间差 / 40% + salLo 计算（120% 封顶）。
- * - 综合完成率 < 80% 时，直接取所在组别薪资区间低限（floored=true）。
- */
-function salaryOf(
-  spec: CsLevelSpec,
-  rate: number,
-): { raw: number; clamped: number; floored: boolean } {
-  const floored = rate < RATE_LO;
-  const clamped = Math.min(RATE_HI, Math.max(RATE_LO, rate));
-  const raw = ((clamped - RATE_LO) * (spec.salHi - spec.salLo)) / (RATE_HI - RATE_LO) + spec.salLo;
-  return { raw, clamped, floored };
 }
 
 function newResult(emp: CsEmployee, cfg: CsPositionConfig): CsResult {
@@ -154,7 +138,7 @@ function validate(emp: CsEmployee, cfg: CsPositionConfig, r: CsResult): ValidEmp
   if (!v2) r.errors.push(`指标「${gc.ind2.label}」至少需要 1 个月的有效数据`);
   if (!rec) r.errors.push("「接待量」至少需要 1 个月的有效数据");
   if (r.errors.length > 0) return null;
-  const complete = isFullMonthly(v1!) && isFullMonthly(v2!) && isFullMonthly(rec!);
+  const complete = isFullMonthly(v1!) && isFullMonthly(v2!);
   return { emp, gc, v1: v1!, v2: v2!, rec: rec!, complete };
 }
 
@@ -216,7 +200,7 @@ export function computeCs(
   for (const [r, v] of validByEmp) {
     const u = units.get(unitKeyOf(r)) as UnitAgg;
     // 计算有效月份数
-    const vm = Math.min(validMonthCount(v.v1), validMonthCount(v.v2), validMonthCount(v.rec));
+    const vm = Math.min(validMonthCount(v.v1), validMonthCount(v.v2));
     r.validMonths = vm;
 
     // 检查有数据月份的均值是否为 0（无法计算完成率）
@@ -256,6 +240,8 @@ export function computeCs(
 
     r.ind1 = buildDetail(v.gc.ind1, v.v1, u.ind1Means);
     r.ind2 = buildDetail(v.gc.ind2, v.v2, u.ind2Means);
+    r.ind1Avg = avg(v.v1.filter((x): x is number => x !== undefined));
+    r.ind2Avg = avg(v.v2.filter((x): x is number => x !== undefined));
     r.combinedRate = r.ind1.rate * r.ind1.weight + r.ind2.rate * r.ind2.weight;
 
     // 接待量：仅对有数据月份计算
@@ -339,7 +325,7 @@ export function computeCs(
     }
   }
 
-  // 7) 定级 + 定薪（仅 complete=true && participate=true 才完整评级）
+  // 7) 定级（仅 complete=true && participate=true 才完整评级）
   for (const [r, v] of validByEmp) {
     const monthlyDesc = (d: CsIndicatorDetail) =>
       d.monthly
@@ -378,8 +364,8 @@ export function computeCs(
     const d1 = r.ind1 as CsIndicatorDetail;
     const d2 = r.ind2 as CsIndicatorDetail;
     // 基准线口径：有效月份均值（complete=true 时即 3 个月均值）
-    const v1Avg = avg(v.v1.filter((x): x is number => x !== undefined));
-    const v2Avg = avg(v.v2.filter((x): x is number => x !== undefined));
+    const v1Avg = r.ind1Avg as number;
+    const v2Avg = r.ind2Avg as number;
     const dropReasons: string[] = [];
 
     let level: CsLevel = ceiling;
@@ -408,13 +394,7 @@ export function computeCs(
     r.finalLevel = level;
     r.grade = lvlName(cfg, level);
 
-    const spec = levelSpec(v.gc, level);
-    const { raw, clamped, floored } = salaryOf(spec, r.combinedRate as number);
-    r.salaryBand = { lo: spec.salLo, hi: spec.salHi };
-    r.rawSalary = raw;
-    r.monthlySalary = round100(raw);
-
-    // trace
+    // trace（不含 salStr，定薪阶段追加）
     const rateStr =
       `完成率: ${d1.label}[${monthlyDesc(d1)}]→季度${pct(d1.rate)}×${d1.weight}` +
       ` + ${d2.label}[${monthlyDesc(d2)}]→季度${pct(d2.rate)}×${d2.weight}` +
@@ -423,10 +403,7 @@ export function computeCs(
       `排名 ${r.rank}/${r.poolSize}（分位${pct(p)}）, 参评比例${pct(ratio)}（${tier.label}）→ 上限${lvlName(cfg, ceiling)}`;
     const recvStr =
       `接待量季度均值${(r.reception as number).toFixed(1)}${r.receptionOk ? "≥" : "<"}单元季度均值×80%(${(r.receptionThreshold as number).toFixed(1)})`;
-    const salStr = floored
-      ? `综合完成率<80% → 取所在组别薪资区间低限 ${spec.salLo}→取百${r.monthlySalary}`
-      : `薪资[${spec.salLo},${spec.salHi}) 插值: (${pct(clamped)}-80%)×${spec.salHi - spec.salLo}/40%+${spec.salLo}=${raw.toFixed(2)}→取百${r.monthlySalary}`;
-    r.trace = [rateStr, rankStr, recvStr, salStr].join("；");
+    r.trace = [rateStr, rankStr, recvStr].join("；");
 
     if (ceiling !== level && dropReasons.length > 0) {
       r.notes.push(`排名上限${lvlName(cfg, ceiling)}，逐级下调：${dropReasons.join("→")}→最终${r.grade}`);
@@ -440,8 +417,41 @@ export function computeCs(
         .join("/");
       r.notes.push(`月度完成率封顶 120%（${which}）`);
     }
-    if (floored) {
-      r.notes.push("综合完成率<80%，按薪资区间低限定薪");
+  }
+
+  // 8) 分组定薪：按 dept × finalLevel 分组
+  const salaryGroups = new Map<string, { r: CsResult; v: ValidEmp; rate: number }[]>();
+  for (const [r, v] of validByEmp) {
+    if (!r.participate || !v.complete || !r.finalLevel) continue;
+    const key = `${rankKeyOf(r)}||${r.finalLevel}`;
+    const arr = salaryGroups.get(key) ?? [];
+    arr.push({ r, v, rate: r.combinedRate as number });
+    salaryGroups.set(key, arr);
+  }
+  for (const [, members] of salaryGroups) {
+    const rates = members.map((m) => m.rate);
+    const minRate = Math.min(...rates);
+    const maxRate = Math.max(...rates);
+    for (const { r, v } of members) {
+      const spec = levelSpec(v.gc, r.finalLevel as CsLevel);
+      r.salaryBand = { lo: spec.salLo, hi: spec.salHi };
+      let raw: number;
+      if (members.length === 1 || maxRate === minRate) {
+        raw = spec.salLo;
+      } else if ((r.combinedRate as number) === minRate) {
+        raw = spec.salLo;
+      } else if ((r.combinedRate as number) === maxRate) {
+        raw = spec.salHi;
+      } else {
+        raw = spec.salLo + (spec.salHi - spec.salLo) * ((r.combinedRate as number) - minRate) / (maxRate - minRate);
+      }
+      r.rawSalary = raw;
+      r.monthlySalary = round100(raw);
+      // 补充 trace 中 salStr
+      const salStr = members.length === 1 || maxRate === minRate
+        ? `级别内仅${members.length}人(同完成率)→固定${spec.salLo}→取百${r.monthlySalary}`
+        : `级别内${members.length}人 完成率[${pct(minRate)},${pct(maxRate)}] 薪资[${spec.salLo},${spec.salHi}]插值→${raw.toFixed(0)}→取百${r.monthlySalary}`;
+      r.trace += `；${salStr}`;
     }
   }
 

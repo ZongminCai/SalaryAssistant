@@ -80,7 +80,7 @@ describe("客服 Excel 模板 → 解析 → 计算 圆环", () => {
     expect(r.grade).toBe("高级销售/产品顾问");
   });
 
-  it("电商四部：月2 接待量留空 → parseCsUpload 能读出部分月份；computeCs 视为缺月员工不参与评级", async () => {
+  it("电商四部：月2 接待量留空 → ind1/ind2完整故complete=true，正常参与评级", async () => {
     const cfg = CS_CONFIGS.ecom4_cs;
     const ab = writeRows(cfg, [
       ["丁", 0.96, 0.96, 0.96, 0.56, 0.56, 0.56, 1000, "", 1000, "否"],
@@ -89,12 +89,11 @@ describe("客服 Excel 模板 → 解析 → 计算 圆环", () => {
     expect(fileErrors).toEqual([]);
     expect(employees[0].reception).toEqual([1000, undefined, 1000]);
     const out = computeCs(employees, cfg, { 电商四部: 1 });
-    // 缺月不再报错，但不参与完整评级
+    // ind1/ind2 完整 → validMonths=3，complete=true，正常参与评级
     expect(out.results[0].errors).toEqual([]);
-    expect(out.results[0].validMonths).toBe(2);
-    expect(out.results[0].grade).toBeNull();
-    expect(out.results[0].monthlySalary).toBeNull();
-    expect(out.results[0].notes.join(" ")).toMatch(/数据不完整/);
+    expect(out.results[0].validMonths).toBe(3);
+    expect(out.results[0].grade).not.toBeNull();
+    expect(out.results[0].monthlySalary).not.toBeNull();
   });
 
   it("电商四部：「是否参与评级定薪=否」的行被解析为 participate=false，不入排名池", async () => {

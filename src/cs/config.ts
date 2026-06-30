@@ -137,7 +137,7 @@ function buildColumns(base: CsColumn[]): CsColumn[] {
 
 // ---- 导入列 ----
 const NAME_COL: CsColumn = { key: "name", label: "姓名", kind: "name", required: true, comment: "员工姓名（必填）", example: "张三" };
-const RECEPTION_COL: CsColumn = { key: "reception", label: "接待量", kind: "reception", required: true, comment: "分别填写月１/月２/月３ 的接待量（必填）。系统按 3 个月均值参与门槛与并列排名（中级及以上需 ≥ 单元季度均值×80%）", example: 1200 };
+const RECEPTION_COL: CsColumn = { key: "reception", label: "接待量", kind: "reception", required: true, comment: "分别填写月１/月２/月３ 的接待量（列头必须存在，月份可按实际情况留空）。系统按有数据月份均值参与门槛（中级及以上需 ≥ 单元季度均值×80%）；缺月不影响参与完整评级", example: 1200 };
 const EXPERT_COL: CsColumn = { key: "expert_advance", label: "专家进阶达成", kind: "expert_advance", required: false, comment: "是/否。满足专家级进阶要求填「是」；留空/「否」则最高评到高级", example: "否" };
 const PARTICIPATE_COL: CsColumn = { key: "participate", label: "是否参与评级定薪", kind: "participate", required: false, enum: ["是", "否"], comment: "是/否。默认「是」；填「否」时该员工数据仅用于计算评级单元各项均值，不参与排名/定级/定薪", example: "是" };
 

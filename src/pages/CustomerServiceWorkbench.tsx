@@ -163,6 +163,10 @@ export default function CustomerServiceWorkbench({ csKey }: { csKey: CsPositionK
       } },
     { title: "指标1", key: "ind1", width: 220, render: (_: unknown, r: CsResult) => indicatorCell(r.ind1) },
     { title: "指标2", key: "ind2", width: 220, render: (_: unknown, r: CsResult) => indicatorCell(r.ind2) },
+    { title: "指标1季度均值", dataIndex: "ind1Avg", key: "ind1Avg", width: 120,
+      render: (v: number | undefined) => v !== undefined ? v.toFixed(2) : dash },
+    { title: "指标2季度均值", dataIndex: "ind2Avg", key: "ind2Avg", width: 120,
+      render: (v: number | undefined) => v !== undefined ? v.toFixed(2) : dash },
     { title: "综合完成率(季度)", dataIndex: "combinedRate", key: "combinedRate", width: 140,
       render: (v: number | null) => (v === null ? dash : <strong>{(v * 100).toFixed(1)}%</strong>) },
     { title: "接待量", key: "reception", width: 200, render: (_: unknown, r: CsResult) =>

@@ -162,7 +162,7 @@ describe("吉林分部客服接待岗 — 部门/组别校验", () => {
 });
 
 describe("新规则1 — 缺月数据支持", () => {
-  it("缺月员工：不报错、参与单元均值、但不参与排名/定级/定薪", () => {
+  it("缺月员工：指标1/2缺月不参与评级，接待量缺月仍可参与评级", () => {
     const employees = [
       ecomEmp({ name: "A", sat: [96, undefined, 96], conv: rep(56), rec: rep(1000) }),
       ecomEmp({ name: "B", sat: rep(94), conv: rep(54), rec: [1000, 1000, undefined] }),
@@ -172,7 +172,7 @@ describe("新规则1 — 缺月数据支持", () => {
     const a = out.results.find((r) => r.name === "A")!;
     const b = out.results.find((r) => r.name === "B")!;
     const c = out.results.find((r) => r.name === "C")!;
-    // A 缺月但不报错
+    // A 指标1缺月(ind1只有2月) → complete=false，不参与排名/定级/定薪
     expect(a.errors).toEqual([]);
     expect(a.combinedRate).not.toBeNull();
     expect(a.validMonths).toBe(2);
@@ -180,13 +180,13 @@ describe("新规则1 — 缺月数据支持", () => {
     expect(a.grade).toBeNull();
     expect(a.monthlySalary).toBeNull();
     expect(a.notes.join(" ")).toMatch(/数据不完整/);
-    // B 缺月但不报错
+    // B 接待量缺月但 ind1/ind2 完整 → complete=true，正常参与评级
     expect(b.errors).toEqual([]);
     expect(b.combinedRate).not.toBeNull();
-    expect(b.validMonths).toBe(2);
-    expect(b.rank).toBeUndefined();
-    expect(b.grade).toBeNull();
-    expect(b.monthlySalary).toBeNull();
+    expect(b.validMonths).toBe(3);
+    expect(b.rank).toBeDefined();
+    expect(b.grade).not.toBeNull();
+    expect(b.monthlySalary).not.toBeNull();
     // C 数据完整 → 正常评估
     expect(c.errors).toEqual([]);
     expect(c.combinedRate).not.toBeNull();
@@ -276,8 +276,8 @@ describe("新规则2 — 单项指标 120% 封顶", () => {
   });
 });
 
-describe("新规则3 — 综合完成率 < 80% 取所在组别薪资区间低限", () => {
-  it("电商四部：B 综合完成率 0.44 → 取 junior salLo=3400", () => {
+describe("新规则3 — 级别内分组定薪", () => {
+  it("电商四部：B 综合完成率 0.44，级别内仅自己 → salLo=3400", () => {
     const employees = [
       ecomEmp({ name: "A", sat: rep(150), conv: rep(80), rec: rep(1000), expert: true }),
       ecomEmp({ name: "B", sat: rep(50), conv: rep(20), rec: rep(1000) }),
@@ -288,20 +288,17 @@ describe("新规则3 — 综合完成率 < 80% 取所在组别薪资区间低限
     // B sat=0.5, conv=0.4 → combined = 0.5*0.4 + 0.4*0.6 = 0.44
     expect(b.combinedRate).toBeCloseTo(0.44, 6);
     expect(b.combinedRate as number).toBeLessThan(0.8);
-    // B 排名 2，分位 0.5 → ceiling=junior（>middle 0.25）
+    // B 排名 2，分位 0.5 → ceiling=junior
     expect(b.ceilingLevel).toBe("junior");
     expect(b.finalLevel).toBe("junior");
     expect(b.salaryBand).toEqual({ lo: 3400, hi: 4200 });
-    // 取低限
+    // 级别内仅 1 人（A 是 expert，B 是 junior）→ salLo
     expect(b.monthlySalary).toBe(3400);
-    expect(b.notes.join(" ")).toMatch(/按薪资区间低限定薪/);
-    expect(b.trace).toMatch(/取所在组别薪资区间低限/);
   });
 
-  it("吉林：低限取自所在组别（不同组别低限不同）", () => {
-    // 标准服务组 junior=3200, 售前服务组（官旗）junior=3000
+  it("吉林：同部门不同组别同级别 → 同分组，最低取salLo最高取salHi", () => {
+    // 标准服务组 junior=3200~4000，售前服务组（官旗）junior=3000~3800
     const employees = [
-      // 单元1：标准服务组（A 一人则均值=个人值，combined=1.0；改成 2 人让其中之一<80%）
       emp({
         name: "A1",
         dept: "天猫",
@@ -313,10 +310,9 @@ describe("新规则3 — 综合完成率 < 80% 取所在组别薪资区间低限
         name: "A2",
         dept: "天猫",
         group: "标准服务组",
-        values: { 客户满意度: rep(50), 响应时间: rep(40) }, // 远差
+        values: { 客户满意度: rep(50), 响应时间: rep(40) },
         rec: rep(1500),
       }),
-      // 单元2：售前服务组（官旗）
       emp({
         name: "B1",
         dept: "天猫",
@@ -328,23 +324,28 @@ describe("新规则3 — 综合完成率 < 80% 取所在组别薪资区间低限
         name: "B2",
         dept: "天猫",
         group: "售前服务组（官旗）",
-        values: { 转化率: rep(20), 响应时间: rep(40) }, // 远差
+        values: { 转化率: rep(20), 响应时间: rep(40) },
         rec: rep(1500),
       }),
     ];
     const out = computeCs(employees, JILIN, { 天猫: 4, 抖音: 0, 拼多多: 0 });
+    const a1 = out.results.find((r) => r.name === "A1")!;
     const a2 = out.results.find((r) => r.name === "A2")!;
+    const b1 = out.results.find((r) => r.name === "B1")!;
     const b2 = out.results.find((r) => r.name === "B2")!;
+    expect(a1.errors).toEqual([]);
     expect(a2.errors).toEqual([]);
+    expect(b1.errors).toEqual([]);
     expect(b2.errors).toEqual([]);
-    // 都应该 <80%
-    expect(a2.combinedRate as number).toBeLessThan(0.8);
-    expect(b2.combinedRate as number).toBeLessThan(0.8);
-    // 取所在组别 junior 低限：标准服务组=3200；售前服务组（官旗）=3000
+    // A2、B2 完成率都很低，应为 junior
+    expect(a2.finalLevel).toBe("junior");
+    expect(b2.finalLevel).toBe("junior");
+    // 同部门(天猫) 同级别(junior) → 同分组，A2 完成率较高取自己的 salHi，B2 完成率较低取自己的 salLo
     expect(a2.salaryBand!.lo).toBe(3200);
-    expect(a2.monthlySalary).toBe(3200);
     expect(b2.salaryBand!.lo).toBe(3000);
-    expect(b2.monthlySalary).toBe(3000);
+    // A2 是分组内最高 → salHi，B2 是分组内最低 → salLo
+    expect(a2.monthlySalary).toBe(4000); // 标准服务组 junior salHi=4000
+    expect(b2.monthlySalary).toBe(3000); // 售前服务组（官旗）junior salLo=3000
   });
 });
 
@@ -423,7 +424,7 @@ describe("新规则4 — 是否参与评级定薪", () => {
 });
 
 describe("综合：新旧规则组合", () => {
-  it("封顶 + 接待量足 + 排名第一 + expert 进阶 → 专家级最高薪", () => {
+  it("封顶 + 接待量足 + 排名第一 + expert 进阶 → 专家级；级别内仅自己取salLo", () => {
     const employees = [
       ecomEmp({ name: "A", sat: rep(200), conv: rep(200), rec: rep(2000), expert: true }),
       ecomEmp({ name: "B", sat: rep(95), conv: rep(55), rec: rep(1000) }),
@@ -436,9 +437,9 @@ describe("综合：新旧规则组合", () => {
     expect(a.combinedRate).toBeCloseTo(1.2, 6);
     expect(a.ind1!.anyCapped).toBe(true);
     expect(a.ind2!.anyCapped).toBe(true);
-    // p=0/3=0 ≤ expert(0.03) → 专家上限；基准线 99/62 sat=200 ✓ conv=200 ✓
+    // p=0/3=0 ≤ expert(0.03) → 专家上限
     expect(a.finalLevel).toBe("expert");
-    // 插值 (1.2-0.8)*(5500-5000)/0.4 + 5000 = 5500
-    expect(a.monthlySalary).toBe(5500);
+    // 级别内仅 A 一人（B、C 是 junior）→ salLo=5000
+    expect(a.monthlySalary).toBe(5000);
   });
 });
