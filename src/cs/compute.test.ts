@@ -296,6 +296,41 @@ describe("新规则3 — 级别内分组定薪", () => {
     expect(b.monthlySalary).toBe(3400);
   });
 
+  it("插值区间下限锁定80%：有人<80%时中间人按[80%,max]插值", () => {
+    // 4人同部门，均因 sat<95 或 conv<62 无法通过中级以上基准线 → 全部 junior
+    // A 完成率<80% → salLo；D 最高 → salHi；B/C 中间按 [80%, D_rate] 插值
+    const employees = [
+      ecomEmp({ name: "A", sat: rep(60), conv: rep(20), rec: rep(1000) }),
+      ecomEmp({ name: "B", sat: rep(85), conv: rep(42), rec: rep(1000) }),
+      ecomEmp({ name: "C", sat: rep(92), conv: rep(50), rec: rep(1000) }),
+      ecomEmp({ name: "D", sat: rep(94), conv: rep(60), rec: rep(1000) }),
+    ];
+    const out = computeCs(employees, ECOM, { 电商四部: 4 });
+    const a = out.results.find((r) => r.name === "A")!;
+    const b = out.results.find((r) => r.name === "B")!;
+    const c = out.results.find((r) => r.name === "C")!;
+    const d = out.results.find((r) => r.name === "D")!;
+    // 全部为 junior（基准线不通过）
+    expect(a.finalLevel).toBe("junior");
+    expect(b.finalLevel).toBe("junior");
+    expect(c.finalLevel).toBe("junior");
+    expect(d.finalLevel).toBe("junior");
+    // A < 80% → salLo
+    expect(a.combinedRate as number).toBeLessThan(0.8);
+    expect(a.monthlySalary).toBe(3400);
+    // D 最高 → salHi
+    expect(d.monthlySalary).toBe(4200);
+    // B/C ≥ 80%，按 [80%, D.rate] 插值，结果在 (salLo, salHi) 之间
+    expect(b.combinedRate as number).toBeGreaterThanOrEqual(0.8);
+    expect(c.combinedRate as number).toBeGreaterThanOrEqual(0.8);
+    expect(b.monthlySalary).toBeGreaterThan(3400);
+    expect(b.monthlySalary).toBeLessThan(4200);
+    expect(c.monthlySalary).toBeGreaterThan(3400);
+    expect(c.monthlySalary).toBeLessThan(4200);
+    // C 完成率 > B → C 薪资 > B
+    expect(c.monthlySalary).toBeGreaterThan(b.monthlySalary as number);
+  });
+
   it("吉林：同部门不同组别同级别 → 同分组，最低取salLo最高取salHi", () => {
     // 标准服务组 junior=3200~4000，售前服务组（官旗）junior=3000~3800
     // A2/B2 完成率≥80% 但排名靠后(p≥0.5) → junior

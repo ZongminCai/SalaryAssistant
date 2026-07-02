@@ -432,20 +432,20 @@ export function computeCs(
     const rates = members.map((m) => m.rate);
     const minRate = Math.min(...rates);
     const maxRate = Math.max(...rates);
+    const effectiveMinRate = minRate < 0.8 ? 0.8 : minRate;
     for (const { r, v } of members) {
       const spec = levelSpec(v.gc, r.finalLevel as CsLevel);
       r.salaryBand = { lo: spec.salLo, hi: spec.salHi };
       let raw: number;
       if ((r.combinedRate as number) < 0.8) {
         raw = spec.salLo;
-      } else if (members.length === 1 || maxRate === minRate) {
-        raw = spec.salLo;
-      } else if ((r.combinedRate as number) === minRate) {
+      } else if (members.length === 1 || maxRate === effectiveMinRate) {
         raw = spec.salLo;
       } else if ((r.combinedRate as number) === maxRate) {
         raw = spec.salHi;
       } else {
-        raw = spec.salLo + (spec.salHi - spec.salLo) * ((r.combinedRate as number) - minRate) / (maxRate - minRate);
+        raw = spec.salLo + (spec.salHi - spec.salLo)
+          * ((r.combinedRate as number) - effectiveMinRate) / (maxRate - effectiveMinRate);
       }
       r.rawSalary = raw;
       r.monthlySalary = round100(raw);
@@ -453,10 +453,10 @@ export function computeCs(
       let salStr: string;
       if ((r.combinedRate as number) < 0.8) {
         salStr = `完成率<80%→固定${spec.salLo}→取百${r.monthlySalary}`;
-      } else if (members.length === 1 || maxRate === minRate) {
+      } else if (members.length === 1 || maxRate === effectiveMinRate) {
         salStr = `级别内仅${members.length}人(同完成率)→固定${spec.salLo}→取百${r.monthlySalary}`;
       } else {
-        salStr = `级别内${members.length}人 完成率[${pct(minRate)},${pct(maxRate)}] 薪资[${spec.salLo},${spec.salHi}]插值→${raw.toFixed(0)}→取百${r.monthlySalary}`;
+        salStr = `级别内${members.length}人 完成率[${pct(effectiveMinRate)},${pct(maxRate)}] 薪资[${spec.salLo},${spec.salHi}]插值→${raw.toFixed(0)}→取百${r.monthlySalary}`;
       }
       r.trace += `；${salStr}`;
     }
