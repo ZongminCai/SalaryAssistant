@@ -181,6 +181,10 @@ function computeCrossBorder(emp: Employee, r: PositionResult): void {
     cfg.mgmt_min_span,
     (v) => `个人业绩 ${v} 万元 低于最低评级区间，需谈薪/人工处理`,
   );
+  // 组长 grade 锁定：保持"组长"，不用业绩区间对应职级覆盖（仅在 grade 已成功生成时）
+  if (emp.level === "组长" && r.grade !== null) {
+    r.grade = "组长";
+  }
 }
 
 function computeMall(emp: Employee, r: PositionResult): void {
