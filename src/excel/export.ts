@@ -2,11 +2,7 @@ import * as XLSX from "xlsx";
 import type { PositionResult } from "../calc/types";
 import type { PositionConfig } from "../positions/registry";
 import { formatBracket } from "../calc/engine";
-
-function fmtDate(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
-}
+import { fmtDate, triggerDownload } from "./shared";
 
 export function exportResults(results: PositionResult[], cfg: PositionConfig): void {
   // 通用输入列
@@ -83,13 +79,5 @@ export function exportResults(results: PositionResult[], cfg: PositionConfig): v
   }
 
   const ab = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
-  const blob = new Blob([ab], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${cfg.label}-${fmtDate(new Date())}-评级结果.xlsx`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  triggerDownload(ab, `${cfg.label}-${fmtDate(new Date())}-评级结果.xlsx`);
 }

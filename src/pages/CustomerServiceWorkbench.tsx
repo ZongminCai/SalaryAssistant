@@ -37,11 +37,14 @@ function indicatorCell(d: CsIndicatorDetail | undefined) {
       {d.anyCapped && (
         <Tag color="orange" style={{ marginLeft: 4 }}>含封顶</Tag>
       )}
+      {d.monthly.some((m) => m.target === "baseline") && (
+        <Tag color="purple" style={{ marginLeft: 4 }}>小组基准线</Tag>
+      )}
       <div style={{ color: "#888", fontSize: 12 }}>
         {d.monthly
           .map(
             (m, i) =>
-              `${i + 1}月 ${m.value}/均${m.mean.toFixed(1)}=${(m.rate * 100).toFixed(0)}%${m.capped ? "(封顶)" : ""}`,
+              `${i + 1}月 ${m.value}/${m.target === "baseline" ? "基准" : "均"}${m.mean.toFixed(1)}=${(m.rate * 100).toFixed(0)}%${m.capped ? "(封顶)" : ""}`,
           )
           .join(" · ")}
       </div>
@@ -64,7 +67,7 @@ export default function CustomerServiceWorkbench({ csKey }: { csKey: CsPositionK
     for (const dept of cfg.depts) m[dept] = 0;
     for (const e of employees) {
       if (e.participate === false) continue;
-      const dept = cfg.hasDeptGroup ? e.dept : cfg.depts[0];
+      const dept = e.dept;
       if (dept && dept in m) m[dept] += 1;
     }
     return m;
@@ -145,12 +148,8 @@ export default function CustomerServiceWorkbench({ csKey }: { csKey: CsPositionK
       render: (v: number) => `第${v}行` },
     { title: "姓名", dataIndex: "name", key: "name", width: 90, fixed: "left" as const,
       render: (v: string) => v || dash },
-    ...(cfg.hasDeptGroup
-      ? [
-          { title: "部门", dataIndex: "dept", key: "dept", width: 80, render: (v: string) => v || dash },
-          { title: "组别", dataIndex: "group", key: "group", width: 180, render: (v: string) => v || dash },
-        ]
-      : []),
+    { title: "部门", dataIndex: "dept", key: "dept", width: 100, render: (v: string) => v || dash },
+    { title: "组别", dataIndex: "group", key: "group", width: 180, render: (v: string) => v || dash },
     { title: "参评定薪", dataIndex: "participate", key: "participate", width: 88,
       render: (v: boolean) => v
         ? <Tag color="green">是</Tag>
@@ -169,10 +168,11 @@ export default function CustomerServiceWorkbench({ csKey }: { csKey: CsPositionK
       render: (v: number | undefined) => v !== undefined ? v.toFixed(2) : dash },
     { title: "综合完成率(季度)", dataIndex: "combinedRate", key: "combinedRate", width: 140,
       render: (v: number | null) => (v === null ? dash : <strong>{(v * 100).toFixed(1)}%</strong>) },
-    { title: "接待量", key: "reception", width: 200, render: (_: unknown, r: CsResult) =>
-        r.reception === undefined ? dash : (
+    { title: "接待量", key: "reception", width: 230, render: (_: unknown, r: CsResult) =>
+        r.dailyReception === undefined ? dash : (
           <span>
-            季度均值 <strong>{r.reception.toFixed(0)}</strong>
+            日均 <strong>{r.dailyReception.toFixed(1)}</strong>
+            <span style={{ color: "#888", fontSize: 12 }}>（组内{(r.unitDailyReception ?? 0).toFixed(1)}×90%={r.receptionThreshold?.toFixed(1)}）</span>
             {r.receptionOk !== undefined && (
               <Tag color={r.receptionOk ? "green" : "red"} style={{ marginLeft: 4 }}>
                 {r.receptionOk ? "达标" : "不足"}
@@ -180,7 +180,8 @@ export default function CustomerServiceWorkbench({ csKey }: { csKey: CsPositionK
             )}
             {r.receptionMonthly && (
               <div style={{ color: "#888", fontSize: 12 }}>
-                {r.receptionMonthly.map((m, i) => `${i + 1}月 ${m.value}`).join(" · ")}
+                {r.receptionMonthly.map((v, i) => `${i + 1}月 ${v ?? "—"}`).join(" · ")}
+                {r.attendanceDays !== undefined && ` · 出勤${r.attendanceDays}天`}
               </div>
             )}
           </span>
@@ -201,8 +202,15 @@ export default function CustomerServiceWorkbench({ csKey }: { csKey: CsPositionK
         ) },
     { title: "排名上限", dataIndex: "ceilingLevel", key: "ceiling", width: 110,
       render: (v: CsResult["ceilingLevel"]) => (v ? cfg.levelNames[v] : dash) },
-    { title: "岗位评定", dataIndex: "grade", key: "grade", width: 150,
-      render: (v: string | null) => (v ? <Tag color="blue">{v}</Tag> : dash) },
+    { title: "岗位评定", dataIndex: "grade", key: "grade", width: 170,
+      render: (v: string | null, r: CsResult) => (v ? (
+        <span>
+          <Tag color="blue">{v}</Tag>
+          {r.leaveCapped && (
+            <Tag color="volcano">事假封顶（原评{r.evaluatedLevel ? cfg.levelNames[r.evaluatedLevel] : ""}/{r.evaluatedSalary ?? ""}）</Tag>
+          )}
+        </span>
+      ) : dash) },
     { title: "次季度月薪(元)", dataIndex: "monthlySalary", key: "monthlySalary", width: 120,
       render: (v: number | null) => (v !== null ? <strong style={{ color: "#1677ff" }}>{v.toLocaleString()}</strong> : dash) },
     { title: "计算依据", dataIndex: "trace", key: "trace", width: 420,
@@ -224,8 +232,9 @@ export default function CustomerServiceWorkbench({ csKey }: { csKey: CsPositionK
         <h3>1. 下载本岗位模板</h3>
         <p style={{ color: "#6b7280", margin: "0 0 12px" }}>
           客服接待岗为「队列评级」：按月计算完成率（≤120% 封顶）后取 3 个月均值，岗位级别由部门内排名分位 + 参评比例档位决定；
-          综合完成率 {"<"} 80% 时以所在组别薪资区间低限定薪；「是否参与评级定薪」填「否」的员工仅作为单元均值样本。
-          模板已为每个指标与接待量展开 月1/月2/月3 三列；Sheet「填写说明」含各组指标与部门-组别对应关系。
+          中级及以上须达基准线且 个人日均接待量≥组内日均×90%；综合完成率 {"<"} 80% 时以所在组别薪资区间低限定薪；
+          季度事假≥5天取消正向评级（评级/薪资只降不升）；「是否参与评级定薪」填「否」的员工仅作为均值样本。
+          模板已为每个指标与接待量展开 月1/月2/月3 三列，并含「季度出勤天数/季度事假天数/当前级别/当前月薪」单值列；Sheet「填写说明」含各组指标与部门-组别对应关系。
         </p>
         <Button type="primary" icon={<DownloadOutlined />} onClick={() => downloadCsTemplate(cfg)}>
           下载 {cfg.label} 模板
@@ -238,7 +247,7 @@ export default function CustomerServiceWorkbench({ csKey }: { csKey: CsPositionK
           <p className="ant-upload-drag-icon"><InboxOutlined /></p>
           <p className="ant-upload-text">点击或将 .xlsx 文件拖到此处</p>
           <p className="ant-upload-hint" style={{ color: "#9ca3af" }}>
-            只接受用本岗位模板生成的表格；每人只填本组别对应的 2 个指标，各指标与接待量均需分别填写月1/月2/月3 三个月的数据；最后一列「是否参与评级定薪」默认「是」，填「否」仅作均值样本
+            只接受用本岗位模板生成的表格；每人只填本组别对应的 2 个指标，各指标与接待量均需分别填写月1/月2/月3 三个月的数据；「季度出勤天数」必填；事假≥5天者须填「当前级别」「当前月薪」；最后一列「是否参与评级定薪」默认「是」，填「否」仅作均值样本
           </p>
         </Upload.Dragger>
         {fileName && (

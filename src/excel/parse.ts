@@ -1,19 +1,7 @@
 import * as XLSX from "xlsx";
 import type { Employee } from "../calc/types";
 import type { FieldDef, PositionConfig } from "../positions/registry";
-
-const BOOL_TRUE = new Set(["是", "true", "TRUE", "True", "y", "Y", "yes", "1", 1, true]);
-const BOOL_FALSE = new Set(["否", "false", "FALSE", "False", "n", "N", "no", "0", 0, false, "", null, undefined]);
-
-function looksLikeExampleRow(row: Record<string, unknown>): boolean {
-  const first = Object.values(row)[0];
-  if (typeof first === "string" && first.startsWith("示例")) return true;
-  return false;
-}
-
-function isEmptyRow(row: Record<string, unknown>): boolean {
-  return Object.values(row).every((v) => v === "" || v === null || v === undefined);
-}
+import { BOOL_FALSE, BOOL_TRUE, isEmptyRow, looksLikeExampleRow } from "./shared";
 
 function parseField(
   raw: unknown,

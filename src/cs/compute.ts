@@ -4,7 +4,7 @@ import {
   findGroupConfig,
   tierOf,
 } from "./config";
-import { MONTH_COUNT } from "./types";
+import { CS_LEVEL_ORDER, MONTH_COUNT } from "./types";
 import type {
   CsEmployee,
   CsGroupConfig,
@@ -14,7 +14,6 @@ import type {
   CsLevelSpec,
   CsMonthlyRate,
   CsPositionConfig,
-  CsReceptionMonthly,
   CsResult,
   DeptParticipation,
 } from "./types";
@@ -27,7 +26,12 @@ const LEVEL_LOWER: Record<CsLevel, CsLevel> = {
 };
 
 const RATE_HI = 1.2;
-const RECEPTION_FACTOR = 0.8;
+/** 日均接待量门槛系数：个人日均 ≥ 组内日均×90% */
+const RECEPTION_FACTOR = 0.9;
+/** 组别可参评人数 ≤ 此值时，完成率目标值按月确定（团队均值 or 中级基准线） */
+const SMALL_UNIT_SIZE = 3;
+/** 季度事假天数 ≥ 此值时取消正向评级资格 */
+const LEAVE_DAYS_LIMIT = 5;
 
 export interface CsComputeOutput {
   results: CsResult[];
@@ -38,20 +42,24 @@ export interface CsComputeOutput {
 
 function avg(xs: number[]): number {
   if (xs.length === 0) return 0;
-  return xs.reduce((a, b) => a + b, 0) / xs.length;
+  return xs.reduce((a, b) => a + b) / xs.length;
+}
+
+function sum(xs: number[]): number {
+  return xs.reduce((a, b) => a + b, 0);
 }
 
 function pct(x: number): string {
   return `${(x * 100).toFixed(1)}%`;
 }
 
-/** 单月完成率：先按方向计算，再做 120% 封顶 */
+/** 单月完成率：value ÷ target（按方向），再做 120% 封顶 */
 function monthlyRateCapped(
   ind: CsIndicator,
   value: number,
-  mean: number,
+  target: number,
 ): { rate: number; capped: boolean } {
-  const ratio = value / mean;
+  const ratio = value / target;
   const raw = ind.direction === "positive" ? ratio : 2 - ratio;
   if (raw > RATE_HI) return { rate: RATE_HI, capped: true };
   return { rate: raw, capped: false };
@@ -67,15 +75,16 @@ function levelSpec(gc: CsGroupConfig, level: CsLevel): CsLevelSpec {
   return gc[level];
 }
 
-function newResult(emp: CsEmployee, cfg: CsPositionConfig): CsResult {
-  const unitLabel = cfg.hasDeptGroup
-    ? `${emp.dept ?? "?"} / ${emp.group ?? "?"}`
-    : cfg.depts[0];
+function levelIdx(level: CsLevel): number {
+  return CS_LEVEL_ORDER.indexOf(level);
+}
+
+function newResult(emp: CsEmployee): CsResult {
   return {
     name: emp.name ?? "",
-    dept: cfg.hasDeptGroup ? emp.dept : cfg.depts[0],
+    dept: emp.dept,
     group: emp.group,
-    unitLabel,
+    unitLabel: `${emp.dept ?? "?"} / ${emp.group ?? "?"}`,
     combinedRate: null,
     expertAdvance: emp.expertAdvance,
     participate: emp.participate !== false,
@@ -113,16 +122,16 @@ interface ValidEmp {
   v1: (number | undefined)[]; // ind1 月度值，长度 MONTH_COUNT（缺月为 undefined）
   v2: (number | undefined)[]; // ind2 月度值
   rec: (number | undefined)[]; // 接待量月度值
+  /** 季度出勤天数（日均接待量分母） */
+  attendanceDays: number;
   /** 三项数据（ind1/ind2/reception）均完整（3 个月齐全）→ 可参与完整评级 */
   complete: boolean;
 }
 
 /** 校验并返回月度数据；失败返回 null */
 function validate(emp: CsEmployee, cfg: CsPositionConfig, r: CsResult): ValidEmp | null {
-  if (cfg.hasDeptGroup) {
-    if (!emp.dept) r.errors.push("缺少必填字段「部门」");
-    if (!emp.group) r.errors.push("缺少必填字段「组别」");
-  }
+  if (!emp.dept) r.errors.push("缺少必填字段「部门」");
+  if (!emp.group) r.errors.push("缺少必填字段「组别」");
   const gc = findGroupConfig(cfg, emp.dept, emp.group);
   if (!gc) {
     if (emp.dept || emp.group) {
@@ -137,9 +146,16 @@ function validate(emp: CsEmployee, cfg: CsPositionConfig, r: CsResult): ValidEmp
   if (!v1) r.errors.push(`指标「${gc.ind1.label}」至少需要 1 个月的有效数据`);
   if (!v2) r.errors.push(`指标「${gc.ind2.label}」至少需要 1 个月的有效数据`);
   if (!rec) r.errors.push("「接待量」至少需要 1 个月的有效数据");
+  if (
+    emp.attendanceDays === undefined ||
+    !Number.isFinite(emp.attendanceDays) ||
+    emp.attendanceDays <= 0
+  ) {
+    r.errors.push("「季度出勤天数」必须为正数（用于计算日均接待量）");
+  }
   if (r.errors.length > 0) return null;
   const complete = isFullMonthly(v1!) && isFullMonthly(v2!);
-  return { emp, gc, v1: v1!, v2: v2!, rec: rec!, complete };
+  return { emp, gc, v1: v1!, v2: v2!, rec: rec!, attendanceDays: emp.attendanceDays!, complete };
 }
 
 function lvlName(cfg: CsPositionConfig, level: CsLevel): string {
@@ -155,32 +171,35 @@ export function computeCs(
   const results: CsResult[] = [];
   const validByEmp = new Map<CsResult, ValidEmp>();
   for (const emp of employees) {
-    const r = newResult(emp, cfg);
+    const r = newResult(emp);
+    r.leaveDays = emp.leaveDays;
+    r.currentLevel = emp.currentLevel;
+    r.currentSalary = emp.currentSalary;
     const v = validate(emp, cfg, r);
     if (v) validByEmp.set(r, v);
     results.push(r);
   }
 
-  // 2) 评级单元 / 排名池 分组 key
-  const unitKeyOf = (r: CsResult) =>
-    cfg.hasDeptGroup ? `${r.dept}||${r.group}` : cfg.depts[0];
-  const rankKeyOf = (r: CsResult) => (cfg.hasDeptGroup ? (r.dept as string) : cfg.depts[0]);
+  // 2) 评级单元（组别）/ 排名池（部门）分组 key
+  const unitKeyOf = (r: CsResult) => `${r.dept}||${r.group}`;
+  const rankKeyOf = (r: CsResult) => r.dept as string;
 
-  // 3) 各评级单元 × 月度的指标/接待量均值
+  // 3) 各评级单元 × 月度的指标均值 + 组内日均接待量
   interface UnitAgg {
     gc: CsGroupConfig;
     members: { r: CsResult; v: ValidEmp }[];
     /** 长度 MONTH_COUNT */
     ind1Means: number[];
     ind2Means: number[];
-    receptionMeans: number[];
+    /** 组内日均接待量 = Σ组内季度接待量 ÷ Σ组内季度出勤天数 */
+    unitDailyReception: number;
   }
   const units = new Map<string, UnitAgg>();
   for (const [r, v] of validByEmp) {
     const k = unitKeyOf(r);
     let u = units.get(k);
     if (!u) {
-      u = { gc: v.gc, members: [], ind1Means: [], ind2Means: [], receptionMeans: [] };
+      u = { gc: v.gc, members: [], ind1Means: [], ind2Means: [], unitDailyReception: 0 };
       units.set(k, u);
     }
     u.members.push({ r, v });
@@ -189,11 +208,24 @@ export function computeCs(
     for (let m = 0; m < MONTH_COUNT; m++) {
       const v1Vals = u.members.map((x) => x.v.v1[m]).filter((v): v is number => v !== undefined && Number.isFinite(v));
       const v2Vals = u.members.map((x) => x.v.v2[m]).filter((v): v is number => v !== undefined && Number.isFinite(v));
-      const recVals = u.members.map((x) => x.v.rec[m]).filter((v): v is number => v !== undefined && Number.isFinite(v));
       u.ind1Means.push(v1Vals.length > 0 ? avg(v1Vals) : 0);
       u.ind2Means.push(v2Vals.length > 0 ? avg(v2Vals) : 0);
-      u.receptionMeans.push(recVals.length > 0 ? avg(recVals) : 0);
     }
+    const recTotal = sum(
+      u.members.flatMap((x) => x.v.rec).filter((v): v is number => v !== undefined && Number.isFinite(v)),
+    );
+    const attTotal = sum(u.members.map((x) => x.v.attendanceDays));
+    u.unitDailyReception = attTotal > 0 ? recTotal / attTotal : 0;
+  }
+
+  // 3.5) 组别可参评人数（complete && participate）→ 决定完成率目标值口径
+  const evaluableCount = new Map<string, number>();
+  for (const [key, u] of units) {
+    evaluableCount.set(key, u.members.filter((x) => x.v.complete && x.r.participate).length);
+  }
+  const smallUnits = new Set<string>();
+  for (const [key, n] of evaluableCount) {
+    if (n <= SMALL_UNIT_SIZE) smallUnits.add(key);
   }
 
   // 4) 月度完成率（120% 封顶）→ 季度均值（仅对有数据月份求均值）
@@ -203,16 +235,40 @@ export function computeCs(
     const vm = Math.min(validMonthCount(v.v1), validMonthCount(v.v2));
     r.validMonths = vm;
 
-    // 检查有数据月份的均值是否为 0（无法计算完成率）
-    const hasZeroMean = (() => {
+    // 可参评≤3人的组：按月确定目标值（当月有数据人数＞3 → 当月均值；否则 → 中级基准线）
+    const smallUnit = smallUnits.has(unitKeyOf(r));
+
+    // 当月目标值：均值口径下检查均值是否为 0（无法计算完成率）
+    const monthlyTarget = (
+      ind: CsIndicator,
+      means: number[],
+      base: number | undefined,
+      m: number,
+    ): { target: number; kind: "mean" | "baseline" } | null => {
+      if (!smallUnit) {
+        if (means[m] <= 0) return null;
+        return { target: means[m], kind: "mean" };
+      }
+      const monthCount = u.members.filter(
+        (x) => x.v[ind === v.gc.ind1 ? "v1" : "v2"][m] !== undefined,
+      ).length;
+      if (monthCount > SMALL_UNIT_SIZE) {
+        if (means[m] <= 0) return null;
+        return { target: means[m], kind: "mean" };
+      }
+      if (base === undefined || base <= 0) return null;
+      return { target: base, kind: "baseline" };
+    };
+
+    const t1Bad = (() => {
       for (let m = 0; m < MONTH_COUNT; m++) {
-        if (v.v1[m] !== undefined && u.ind1Means[m] <= 0) return true;
-        if (v.v2[m] !== undefined && u.ind2Means[m] <= 0) return true;
+        if (v.v1[m] !== undefined && monthlyTarget(v.gc.ind1, u.ind1Means, v.gc.middle.base1, m) === null) return true;
+        if (v.v2[m] !== undefined && monthlyTarget(v.gc.ind2, u.ind2Means, v.gc.middle.base2, m) === null) return true;
       }
       return false;
     })();
-    if (hasZeroMean) {
-      r.errors.push("评级单元月度指标均值为 0，无法计算完成率");
+    if (t1Bad) {
+      r.errors.push("评级单元当月目标值无效（均值为 0 或缺少中级基准线），无法计算完成率");
       validByEmp.delete(r);
       continue;
     }
@@ -221,12 +277,14 @@ export function computeCs(
       ind: CsIndicator,
       values: (number | undefined)[],
       means: number[],
+      base: number | undefined,
     ): CsIndicatorDetail => {
       const monthly: CsMonthlyRate[] = [];
       for (let m = 0; m < MONTH_COUNT; m++) {
         if (values[m] === undefined || !Number.isFinite(values[m])) continue;
-        const { rate, capped } = monthlyRateCapped(ind, values[m] as number, means[m]);
-        monthly.push({ value: values[m] as number, mean: means[m], rate, capped });
+        const t = monthlyTarget(ind, means, base, m)!;
+        const { rate, capped } = monthlyRateCapped(ind, values[m] as number, t.target);
+        monthly.push({ value: values[m] as number, mean: t.target, target: t.kind, rate, capped });
       }
       return {
         label: ind.label,
@@ -238,30 +296,25 @@ export function computeCs(
       };
     };
 
-    r.ind1 = buildDetail(v.gc.ind1, v.v1, u.ind1Means);
-    r.ind2 = buildDetail(v.gc.ind2, v.v2, u.ind2Means);
+    r.ind1 = buildDetail(v.gc.ind1, v.v1, u.ind1Means, v.gc.middle.base1);
+    r.ind2 = buildDetail(v.gc.ind2, v.v2, u.ind2Means, v.gc.middle.base2);
     r.ind1Avg = avg(v.v1.filter((x): x is number => x !== undefined));
     r.ind2Avg = avg(v.v2.filter((x): x is number => x !== undefined));
     r.combinedRate = r.ind1.rate * r.ind1.weight + r.ind2.rate * r.ind2.weight;
 
-    // 接待量：仅对有数据月份计算
-    const receptionMonthly: CsReceptionMonthly[] = [];
-    for (let m = 0; m < MONTH_COUNT; m++) {
-      if (v.rec[m] === undefined || !Number.isFinite(v.rec[m])) continue;
-      const value = v.rec[m] as number;
-      const mean = u.receptionMeans[m];
-      const threshold = mean * RECEPTION_FACTOR;
-      receptionMonthly.push({ value, mean, threshold, ok: value >= threshold });
-    }
+    // 日均接待量：个人日均 = 季度接待量之和 ÷ 季度出勤天数；门槛 = 组内日均×90%
     const recValues = v.rec.filter((x): x is number => x !== undefined && Number.isFinite(x));
-    const receptionAvg = avg(recValues);
-    const recMeanValues = receptionMonthly.map((rm) => rm.mean);
-    const receptionMeanAvg = avg(recMeanValues);
-    r.receptionMonthly = receptionMonthly;
-    r.reception = receptionAvg;
-    r.receptionMean = receptionMeanAvg;
-    r.receptionThreshold = receptionMeanAvg * RECEPTION_FACTOR;
-    r.receptionOk = receptionAvg >= r.receptionThreshold;
+    const receptionTotal = sum(recValues);
+    const dailyReception = receptionTotal / v.attendanceDays;
+    const threshold = u.unitDailyReception * RECEPTION_FACTOR;
+    r.receptionMonthly = [...v.rec];
+    r.reception = avg(recValues);
+    r.receptionTotal = receptionTotal;
+    r.attendanceDays = v.attendanceDays;
+    r.dailyReception = dailyReception;
+    r.unitDailyReception = u.unitDailyReception;
+    r.receptionThreshold = threshold;
+    r.receptionOk = dailyReception >= threshold;
   }
 
   // 5) 参评比例（按 rankKey/部门）——仅 complete=true && participate=true 计入排名池
@@ -329,7 +382,7 @@ export function computeCs(
   for (const [r, v] of validByEmp) {
     const monthlyDesc = (d: CsIndicatorDetail) =>
       d.monthly
-        .map((mm, i) => `${i + 1}月${pct(mm.rate)}${mm.capped ? "(封顶)" : ""}`)
+        .map((mm, i) => `${i + 1}月${pct(mm.rate)}${mm.capped ? "(封顶)" : ""}${mm.target === "baseline" ? "(基准线)" : ""}`)
         .join("/");
 
     if (!r.participate) {
@@ -378,7 +431,7 @@ export function computeCs(
         if (b1 && b2 && recvOk && r.expertAdvance === true) break;
         const why: string[] = [];
         if (!(b1 && b2)) why.push("基准线未达标");
-        if (!recvOk) why.push("接待量不足");
+        if (!recvOk) why.push("日均接待量不足");
         if (r.expertAdvance !== true) why.push("专家进阶未达成");
         dropReasons.push(`${lvlName(cfg, "expert")}（${why.join("/")}）`);
         level = LEVEL_LOWER[level];
@@ -386,7 +439,7 @@ export function computeCs(
         if (b1 && b2 && recvOk) break;
         const why: string[] = [];
         if (!(b1 && b2)) why.push("基准线未达标");
-        if (!recvOk) why.push("接待量不足");
+        if (!recvOk) why.push("日均接待量不足");
         dropReasons.push(`${lvlName(cfg, level)}（${why.join("/")}）`);
         level = LEVEL_LOWER[level];
       }
@@ -402,7 +455,7 @@ export function computeCs(
     const rankStr =
       `排名 ${r.rank}/${r.poolSize}（分位${pct(p)}）, 参评比例${pct(ratio)}（${tier.label}）→ 上限${lvlName(cfg, ceiling)}`;
     const recvStr =
-      `接待量季度均值${(r.reception as number).toFixed(1)}${r.receptionOk ? "≥" : "<"}单元季度均值×80%(${(r.receptionThreshold as number).toFixed(1)})`;
+      `个人日均接待量${(r.dailyReception as number).toFixed(1)}${r.receptionOk ? "≥" : "<"}组内日均×90%(${(r.receptionThreshold as number).toFixed(1)})`;
     r.trace = [rateStr, rankStr, recvStr].join("；");
 
     if (ceiling !== level && dropReasons.length > 0) {
@@ -416,6 +469,9 @@ export function computeCs(
         .filter(Boolean)
         .join("/");
       r.notes.push(`月度完成率封顶 120%（${which}）`);
+    }
+    if (smallUnits.has(unitKeyOf(r))) {
+      r.notes.push("组别可参评人数≤3，完成率目标值按月确定（当月人数＞3 用团队均值，否则用中级基准线）");
     }
   }
 
@@ -460,6 +516,36 @@ export function computeCs(
       }
       r.trace += `；${salStr}`;
     }
+  }
+
+  // 9) 事假封顶：季度事假≥5天 → 评级与薪资只降不升（高于现状按现状执行）
+  for (const [r, v] of validByEmp) {
+    if (!r.participate || !v.complete || !r.finalLevel) continue;
+    const leaveDays = r.leaveDays ?? 0;
+    if (leaveDays < LEAVE_DAYS_LIMIT) continue;
+    if (r.currentLevel === undefined || r.currentSalary === undefined) {
+      r.errors.push(`季度事假${leaveDays}天（≥${LEAVE_DAYS_LIMIT}天）须填写「当前级别」与「当前月薪」以执行正向评级封顶`);
+      continue;
+    }
+    const evaluatedLevel = r.finalLevel;
+    const evaluatedSalary = r.monthlySalary as number;
+    const higher =
+      levelIdx(evaluatedLevel) > levelIdx(r.currentLevel) ||
+      (evaluatedLevel === r.currentLevel && evaluatedSalary > (r.currentSalary as number));
+    if (!higher) continue; // 评定结果不高于现状 → 正常按评定结果执行（含下调）
+    r.leaveCapped = true;
+    r.evaluatedLevel = evaluatedLevel;
+    r.evaluatedSalary = evaluatedSalary;
+    r.finalLevel = r.currentLevel;
+    r.grade = lvlName(cfg, r.currentLevel);
+    r.monthlySalary = r.currentSalary as number;
+    r.rawSalary = r.currentSalary as number;
+    const spec = levelSpec(v.gc, r.currentLevel);
+    r.salaryBand = { lo: spec.salLo, hi: spec.salHi };
+    r.notes.push(
+      `季度事假${leaveDays}天≥${LEAVE_DAYS_LIMIT}天，取消正向评级：评定${lvlName(cfg, evaluatedLevel)}/${evaluatedSalary}元 高于现状 → 按现状${r.grade}/${r.currentSalary}元执行`,
+    );
+    r.trace += `；事假${leaveDays}天≥${LEAVE_DAYS_LIMIT}天封顶→现状${r.grade}/${r.currentSalary}元`;
   }
 
   return { results, participation, depts: cfg.depts };
