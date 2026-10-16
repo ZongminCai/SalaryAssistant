@@ -85,9 +85,7 @@ export interface CsColumn {
 export interface CsPositionConfig {
   key: CsPositionKey;
   label: string;
-  shortLabel: string;
   description: string;
-  color: string;
   /** 部门列表（天猫/抖音/京东/拼多多服务部） */
   depts: string[];
   /** 评级单元列表 */

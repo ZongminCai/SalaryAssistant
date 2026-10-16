@@ -185,9 +185,7 @@ export const CS_CONFIGS: Record<CsPositionKey, CsPositionConfig> = {
   ecomgroup_cs: {
     key: "ecomgroup_cs",
     label: "电商事业群客服接待岗",
-    shortLabel: "事业群客服",
     description: "天猫/抖音/京东/拼多多四部门多组别；组内均值算完成率、定基准线，部门内跨组排名定级别上限。",
-    color: "#d48806",
     depts: [TM, DY, JD, PDD],
     groups: V2_GROUPS,
     columns: COLUMNS,
@@ -210,17 +208,13 @@ export const CS_CONFIGS: Record<CsPositionKey, CsPositionConfig> = {
 export interface CsCard {
   key: CsPositionKey;
   label: string;
-  shortLabel: string;
   description: string;
-  color: string;
 }
 
 export const CS_CARD_LIST: CsCard[] = [CS_CONFIGS.ecomgroup_cs].map((c) => ({
   key: c.key,
   label: c.label,
-  shortLabel: c.shortLabel,
   description: c.description,
-  color: c.color,
 }));
 
 /** 查找某员工对应的评级单元配置 */

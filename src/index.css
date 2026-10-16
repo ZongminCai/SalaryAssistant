@@ -84,18 +84,6 @@ body {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 }
-.position-card .card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 22px;
-  font-weight: 700;
-  margin-bottom: 12px;
-}
 .position-card h3 {
   margin: 0 0 6px;
   font-size: 16px;

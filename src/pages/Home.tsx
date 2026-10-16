@@ -7,9 +7,7 @@ import { CS_CARD_LIST } from "../cs/config";
 interface HomeCard {
   key: string;
   label: string;
-  shortLabel: string;
   description: string;
-  color: string;
 }
 
 export default function Home() {
@@ -29,9 +27,6 @@ export default function Home() {
           if (e.key === "Enter" || e.key === " ") nav(`/position/${cfg.key}`);
         }}
       >
-        <div className="card-icon" style={{ background: cfg.color }}>
-          {cfg.shortLabel.slice(0, 2)}
-        </div>
         <h3>
           {cfg.label}
           {legacy && (
@@ -68,9 +63,6 @@ export default function Home() {
               if (e.key === "Enter" || e.key === " ") nav("/unified");
             }}
           >
-            <div className="card-icon" style={{ background: "#1677ff" }}>
-              统一
-            </div>
             <h3>
               {UNIFIED_ENTRY_LABEL}
               <Tag style={{ marginLeft: 8 }} color="blue">

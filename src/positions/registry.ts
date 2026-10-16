@@ -23,8 +23,6 @@ export interface PositionConfig {
   label: string;
   shortLabel: string;
   description: string;
-  /** AntD 图标颜色（首页卡片） */
-  color: string;
   fields: FieldDef[];
   /** 额外的"填写说明"提示（Sheet 2 顶部） */
   extraNotes: string[];
@@ -54,7 +52,6 @@ export const POSITION_CONFIGS: Record<PositionKey, PositionConfig> = {
     label: "视频内容岗",
     shortLabel: "视频内容",
     description: "按季度累计实际成交金额评级。区间插值，专家档位 18000 元固定。",
-    color: "#fa541c",
     fields: [
       NAME_FIELD,
       PERF_PERSONAL("季度累计实际成交金额(万元)", "季度累计实际成交金额，单位：万元", 500),
@@ -71,7 +68,6 @@ export const POSITION_CONFIGS: Record<PositionKey, PositionConfig> = {
     label: "跨境运营岗",
     shortLabel: "跨境运营",
     description: "西安/深圳两套区间；组长在管理幅度≥4人时叠加管理薪资；管培生按学历定薪。",
-    color: "#1677ff",
     fields: [
       NAME_FIELD,
       { key: "region", label: "地域", type: "enum", required: "always", enum: ["西安", "深圳"],
@@ -106,7 +102,6 @@ export const POSITION_CONFIGS: Record<PositionKey, PositionConfig> = {
     label: "商务岗",
     shortLabel: "商务",
     description: "专员/主管两套区间；专家档位 18000/18900 元固定。",
-    color: "#52c41a",
     fields: [
       NAME_FIELD,
       { key: "level", label: "职级", type: "enum", required: "always",
@@ -125,7 +120,6 @@ export const POSITION_CONFIGS: Record<PositionKey, PositionConfig> = {
     label: "抖音/快手商城运营岗",
     shortLabel: "商城运营",
     description: "个人评级；组长在管理幅度≥5人时叠加管理薪资；专家档位 45000 元固定。",
-    color: "#722ed1",
     fields: [
       NAME_FIELD,
       { key: "level", label: "职级", type: "enum", required: "always",
@@ -151,7 +145,6 @@ export const POSITION_CONFIGS: Record<PositionKey, PositionConfig> = {
     label: "主播岗",
     shortLabel: "主播",
     description: "官旗/其他账号阈值不同；季度评级 + 月度激励两套并行结果。",
-    color: "#eb2f96",
     fields: [
       NAME_FIELD,
       { key: "account_type", label: "账号类型", type: "enum", required: "always",
@@ -177,7 +170,6 @@ export const POSITION_CONFIGS: Record<PositionKey, PositionConfig> = {
     label: "天猫/拼多多运营岗",
     shortLabel: "天猫拼多多",
     description: "电商三部/其他部门两套区间；高级/中级按比例；区间左开右闭。",
-    color: "#13c2c2",
     fields: [
       NAME_FIELD,
       { key: "dept", label: "部门", type: "enum", required: "always",
@@ -206,7 +198,6 @@ export const POSITION_CONFIGS: Record<PositionKey, PositionConfig> = {
     label: "京东产品运营岗",
     shortLabel: "京东运营",
     description: "按季度月均净销售额单表评级；区间左开右闭；专家档 (>1000万) 固定 45000 元。",
-    color: "#cf1322",
     fields: [
       NAME_FIELD,
       { key: "level", label: "职级", type: "enum", required: "always",
@@ -239,7 +230,6 @@ export const POSITION_CONFIGS: Record<PositionKey, PositionConfig> = {
     label: "直播运营/主播组长岗",
     shortLabel: "直播运营",
     description: "按季度月均净销售额评定个人薪资，人均净产值叠加管理薪资；直播运营组长/主播组长保留原职级名。",
-    color: "#ff7a45",
     fields: [
       NAME_FIELD,
       { key: "level", label: "职级", type: "enum", required: "always",
@@ -272,7 +262,6 @@ export const POSITION_CONFIGS: Record<PositionKey, PositionConfig> = {
     label: "视频运营岗",
     shortLabel: "视频运营",
     description: "按季度月均净销售额评定个人薪资，人均净产值叠加管理薪资；视频运营组长保留原职级名。",
-    color: "#9254de",
     fields: [
       NAME_FIELD,
       { key: "level", label: "职级", type: "enum", required: "always",
