@@ -438,6 +438,11 @@ export function computeOne(emp: Employee): PositionResult {
     salary_bracket: null,
     raw_salary: null,
   };
+  // 行级解析错误（缺必填/枚举越界/岗位无法识别等）的行不再继续计算，
+  // 避免用默认值（如职级留空默认为专员）静默算出错误薪资
+  if (r.errors.length > 0) {
+    return r;
+  }
   if (!emp.position || !(emp.position in DISPATCH)) {
     r.errors.push(`未知 position: ${JSON.stringify(emp.position)}（可选: ${Object.keys(POSITIONS).join("/")}）`);
     return r;

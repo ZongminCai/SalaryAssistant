@@ -23,6 +23,7 @@
 ### 目录与职责
 - `src/calc/`：岗位（销售/运营）薪酬计算引擎（表驱动 + `DISPATCH` 分发）｜`src/cs/`：客服「队列评级」模型（依赖均值/排名/分位，独立于 calc）｜`src/excel/`：岗位 Excel 模板/解析/导出｜`src/positions/`、`src/cs/config.ts`：配置数据｜`src/pages/`：页面｜业务规则改动优先改**配置/表格**而非散落进组件。
 - 新增岗位：在 `positions/registry.ts` + `calc/tables.ts` + `calc/compute.ts` 的 `DISPATCH` 三处登记，**不要**在页面里写岗位特例。
+- 销售/运营统一入口（`/unified`）的模板、解析、校验、导出**一律由 `src/positions/registry.ts` 派生**（派生层 `src/positions/unified.ts`：`UNIFIED_FIELDS`/`POSITION_ALIASES`/`FIELD_POSITION_MATRIX`/`PER_POSITION_RULES` 等），**禁止在页面或解析器里硬编码岗位规则/阈值**；`POSITION_CONFIGS` 仍是唯一规则源。
 
 ### 命名
 - **新增模块一律 camelCase**（变量/函数/对象字段、布尔 `is/has` 前缀、事件 `handleXxx`）。

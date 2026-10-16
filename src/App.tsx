@@ -1,6 +1,7 @@
 import { Link, Route, Routes } from "react-router-dom";
 import Home from "./pages/Home";
 import PositionWorkbench from "./pages/PositionWorkbench";
+import UnifiedWorkbench from "./pages/UnifiedWorkbench";
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
       <main className="app-main">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/unified" element={<UnifiedWorkbench />} />
           <Route path="/position/:positionKey" element={<PositionWorkbench />} />
         </Routes>
       </main>
