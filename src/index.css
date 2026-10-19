@@ -43,23 +43,6 @@ body {
   box-sizing: border-box;
   margin: 0 auto;
 }
-.home-intro {
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px 28px;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-}
-.home-intro h2 {
-  font-size: 18px;
-  margin: 0 0 6px;
-  color: #1f2937;
-}
-.home-intro p {
-  margin: 0;
-  color: #6b7280;
-  font-size: 14px;
-}
 .home-group-title {
   font-size: 15px;
   font-weight: 600;

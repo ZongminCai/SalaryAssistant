@@ -42,14 +42,6 @@ export default function Home() {
 
   return (
     <>
-      <div className="home-intro">
-        <h2>选择岗位开始评级</h2>
-        <p>
-          推荐使用统一入口：一份模板混填多个岗位，每行按「员工岗位」列定岗 → 上传 → 自动算出职级与月薪。
-          旧岗位入口保留一个季度，用于旧模板文件。
-        </p>
-      </div>
-
       <h3 className="home-group-title">销售 / 运营类岗位</h3>
       <Row gutter={[20, 32]}>
         <Col span={24}>
